@@ -1,0 +1,13 @@
+---
+kind: pipeline
+type: kubernetes
+name: compliance
+
+steps:
+  - name: pre-commit linter
+    image: python:3.11.3-alpine3.18
+    commands:
+      - apk add git go bash ruby
+      - pip install pre-commit
+      - pre-commit install --install-hooks
+      - pre-commit run --all-files
