@@ -1,9 +1,11 @@
 """The Key is the known and fixed length type."""
 from __future__ import annotations
 
+import enum
 import os
 import random
 import time
+from typing import Any
 from typing import Generator
 
 
@@ -142,3 +144,120 @@ class UniqueID:
     def process_id(self) -> int:
         """get the process id."""
         return (self._key >> 72) & 0xFF
+
+
+class KeyType(enum.Enum):
+    BOOL = 0    # the truth value, 1 byte
+    BYTE = 1    # the signed integer, 2 byte
+    INT = 2     # the signed integer, 16 byte
+    STR = 3     # the 63-bytes null-end string
+    TEXT = 4    # the 255-bytes arbitrary string
+
+    def __repr__(self):
+        return self.name
+
+    def __str__(self):
+        return self.name
+
+    def __gt__(self, other):
+        match other:
+            case KeyType():
+                return self.value > other.value
+            case _:
+                raise NotImplementedError(f"unknown key type: {other}")
+
+    def __len__(self):
+        match self:
+            case KeyType.BOOL:
+                return 1
+            case KeyType.BYTE:
+                return 2
+            case KeyType.INT:
+                return 16
+            case KeyType.STR:
+                return 64
+            case KeyType.TEXT:
+                return 256
+            case _:
+                raise NotImplementedError(f"unknown key type: {self}")
+
+    @staticmethod
+    def detect(raw: Any) -> KeyType:
+        match raw:
+            case bool():
+                return KeyType.BOOL
+            case int() if -32768 <= raw <= 32767:
+                return KeyType.BYTE
+            case int():
+                return KeyType.INT
+            case str() if len(raw) < 64:
+                return KeyType.STR
+            case str() if len(raw) < 256:
+                return KeyType.TEXT
+            case _:
+                raise NotImplementedError(f"unknown key type: {raw}")
+
+
+class Key:
+    def __init__(self, raw: Any, ktype: KeyType | None = None):
+        self._raw = raw
+        self._ktype = KeyType.detect(raw) if ktype is None else ktype
+        self._value = None
+
+    def __repr__(self):
+        return f"<Key #{self.ktype}> {self.value}"
+
+    def __str__(self):
+        return self.value
+
+    def __eq__(self, other):
+        match other:
+            case Key():
+                ktype = max(self.ktype, other.ktype)
+                return self.cast(ktype).value == other.cast(ktype).value
+            case _:
+                return self.value == other
+
+    def __lt__(self, other):
+        match other:
+            case Key():
+                ktype = max(self.ktype, other.ktype)
+                return self.cast(ktype).value < other.cast(ktype).value
+            case _:
+                return self.value < other
+
+    @property
+    def raw(self) -> Any:
+        return self._raw
+
+    @property
+    def ktype(self) -> KeyType:
+        return self._ktype
+
+    @property
+    def value(self) -> Any:
+        if self._value is None:
+            match self.ktype:
+                case KeyType.BOOL:
+                    self._value = bool(self.raw)
+                case KeyType.BYTE | KeyType.INT:
+                    self._value = int(self.raw)
+                case KeyType.STR | KeyType.TEXT:
+                    self._value = str(self.raw)
+                case _:
+                    raise NotImplementedError(f"unknown key type: {self.ktype}")
+
+        return self._value
+
+    def cast(self, ktype: KeyType) -> Key:
+        match ktype:
+            case KeyType.BOOL:
+                return Key(bool(self.value), ktype)
+            case KeyType.BYTE | KeyType.INT:
+                return Key(int(self.value), ktype)
+            case KeyType.STR | KeyType.TEXT if self.ktype == KeyType.BOOL:
+                return Key(str(int(self.value)), ktype)
+            case KeyType.STR | KeyType.TEXT:
+                return Key(str(self.value), ktype)
+            case _:
+                raise NotImplementedError(f"unknown key type: {ktype}")
