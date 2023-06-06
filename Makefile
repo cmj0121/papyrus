@@ -14,7 +14,7 @@ clean: $(SUBDIR)	# clean-up environment
 	@rm -rf dist/
 
 test: $(VENV)		# run test
-	$(POETRY) run pytest -v -n auto --no-cov-on-fail
+	$(POETRY) run pytest -v -n auto --cov=src/papyrus --no-cov-on-fail
 
 run:				# run in the local environment
 	$(POETRY) run papyrus

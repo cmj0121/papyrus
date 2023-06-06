@@ -29,6 +29,7 @@ python = "~3.11"
 pytest = "7.3.1"
 pytest-xdist = "3.3.1"
 pytest-cov = "4.1.0"
+faker = "18.10.1"
 
 [build-system]
 requires = ["poetry-core"]
