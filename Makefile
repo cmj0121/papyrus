@@ -1,19 +1,29 @@
+include Makefile.in
+
 SUBDIR :=
 
-.PHONY: all clean test run build upgrade help $(SUBDIR)
+.PHONY: all clean test run build install upgrade help $(SUBDIR)
 
 all: $(SUBDIR) 		# default action
 	@[ -f .git/hooks/pre-commit ] || pre-commit install --install-hooks
 	@git config commit.template .git-commit-template
 
 clean: $(SUBDIR)	# clean-up environment
-	@find . -name '*.sw[po]' -delete
+	@find . -name '*.sw[po]' -o -name '*.py[co]' -delete
+	@find . -name '__pycache__' -delete
+	@rm -rf dist/
 
-test:				# run test
+test: $(VENV)		# run test
+	$(POETRY) run pytest -v -n auto --no-cov-on-fail
 
 run:				# run in the local environment
+	$(POETRY) run papyrus
 
-build:				# build the binary/library
+build: $(VENV)		# build the binary/library
+	$(POETRY) build
+
+install: $(VENV)		# install the binary tool into local env
+	$(POETRY) install
 
 upgrade:			# upgrade all the necessary packages
 	pre-commit autoupdate
@@ -26,3 +36,6 @@ help:				# show this message
 
 $(SUBDIR):
 	$(MAKE) -C $@ $(MAKECMDGOALS)
+
+$(VENV):
+	$(PYTHON) -m venv $@

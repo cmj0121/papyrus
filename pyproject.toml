@@ -3,3 +3,33 @@ line-length = 128
 
 # Add "Q" to the list of enabled codes.
 select = ["E", "F", "Q"]
+
+[tool.poetry]
+name = "papyrus"
+version = "0.1.0"
+description = "The embeddable, persistent, and revisions storage."
+keywords = ["kv", "embeddable", "persistent", "revisions"]
+authors = ["cmj <cmj@cmj.tw>"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/cmj0121/papyrus"
+
+packages = [
+    { include = "papyrus", from ="src" },
+]
+
+[tool.poetry.scripts]
+papyrus = "papyrus.cli:main"
+
+[tool.poetry.dependencies]
+python = "~3.11"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "7.3.1"
+pytest-xdist = "3.3.1"
+pytest-cov = "4.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

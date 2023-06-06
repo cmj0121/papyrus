@@ -1,1 +1,7 @@
 *.sw[po]
+
+*.py[oc]
+__pycache__/
+dist/
+
+.venv/
