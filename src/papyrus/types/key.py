@@ -80,6 +80,13 @@ class UniqueID(Serializable, Deserializable):
             case _:
                 return self._key == other
 
+    def __lt__(self, other):
+        match other:
+            case UniqueID():
+                return self.key < other.key
+            case _:
+                return self.key < other
+
     def __repr__(self):
         """show the key with verbose."""
         return f"#{str(self)} {self.timestamp=} {self.cluster_id=} {self.process_id=}"
