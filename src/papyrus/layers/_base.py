@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import abc
+from urllib.parse import urlparse
 
 from papyrus.types import Data
 from papyrus.types import Key
@@ -19,6 +20,7 @@ class BaseLayer(abc.ABC):
 
     # the registered layers
     _layers: dict[str, BaseLayer] = {}
+    _instances: dict[str, BaseLayer] = {}
 
     def __init_subclass__(subcls, *args, **kwargs):
         if subcls.name is None:
@@ -27,7 +29,32 @@ class BaseLayer(abc.ABC):
         if subcls.name in BaseLayer._layers:
             raise ValueError(f"{subcls.name} is already registered")
 
+        BaseLayer._layers[subcls.name] = subcls
         super().__init_subclass__(*args, **kwargs)
+
+    @classmethod
+    def open(cls, url: str, /, cached: bool = True) -> BaseLayer:
+        if url not in cls._instances or not cached:
+            uri = urlparse(url)
+
+            layer = BaseLayer._layers[uri.scheme]
+
+            if not cached:
+                return layer(uri)
+
+            cls._instances[url] = layer(uri)
+
+        return cls._instances[url]
+
+    @classmethod
+    def cache_clear(cls, name: str | None = None):
+        """cache the layer instances."""
+        if name is None:
+            cls._instances.clear()
+            return
+
+        if name in cls._instances:
+            del cls._instances[name]
 
     # ======== the general methods related on the layer meta ======== #
     @abc.abstractmethod

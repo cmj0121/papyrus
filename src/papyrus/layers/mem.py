@@ -1,4 +1,6 @@
 """In-memory layer implementation."""
+from urllib.parse import ParseResult
+
 from papyrus.types import Key
 from papyrus.types import UniqueID
 
@@ -15,13 +17,13 @@ class MemLayer(BaseLayer):
     """
     name = "mem"
 
-    # ======== the general methods related on the layer meta ======== #
-    def __init__(self):
+    def __init__(self, /, uri: ParseResult | None = None):
         self._mem: dict[UniqueID, Data] = {}
 
         self._keys: set[Key] = set()
         self._revisions: dict[Key, list[Data]] = {}
 
+    # ======== the general methods related on the layer meta ======== #
     def __len__(self) -> int:
         return len(self._keys)
 

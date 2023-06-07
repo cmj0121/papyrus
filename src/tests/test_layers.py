@@ -1,14 +1,35 @@
 import string
 
 import pytest
+from papyrus.layers import BaseLayer
 from papyrus.layers import Data
-from papyrus.layers import MemLayer
 from papyrus.types import Key
 from papyrus.types import UniqueID
 
 
-@pytest.mark.parametrize("layercls", [MemLayer])
-class TestLayer:
+class TestLayerRegister:
+    @pytest.mark.parametrize(
+        "uri", [
+            "mem://",
+            "mem://test",
+            "mem://test/foo"
+            "mem://test/foo?name=mem",
+        ],
+    )
+    def test_available_layer(self, uri):
+        BaseLayer.open(uri)
+
+    def test_unavailable_layer(self):
+        with pytest.raises(KeyError):
+            BaseLayer.open("unknown://")
+
+
+@pytest.mark.parametrize(
+    "uri", [
+        "mem://",
+    ],
+)
+class TestLayerBasic:
     TEST_KEYS = [
         (True, False),
         range(10),
@@ -17,15 +38,17 @@ class TestLayer:
         (*range(16), *string.ascii_letters),
     ]
 
-    def test_empty_layer(self, layercls):
-        layer = layercls()
+    @pytest.fixture
+    def layer(self, uri):
+        layer = BaseLayer.open(uri, cached=False)
+        yield layer
 
+    def test_empty_layer(self, uri, layer):
         assert len(layer) == 0
         assert layer.cap == 0
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_insert_value(self, layercls, raws):
-        layer = layercls()
+    def test_insert_value(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         for index, data in enumerate(datas):
@@ -40,8 +63,7 @@ class TestLayer:
             assert layer.cap == index + 1
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_delete_value(self, layercls, raws):
-        layer = layercls()
+    def test_delete_value(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         [layer.insert(data) for data in datas]
@@ -59,8 +81,7 @@ class TestLayer:
             assert layer.cap == len(raws) + index + 1
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_latest_value(self, layercls, raws):
-        layer = layercls()
+    def test_latest_value(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         for data in datas:
@@ -73,8 +94,7 @@ class TestLayer:
             assert layer.latest(data.primary_key) is None
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_revisions(self, layercls, raws):
-        layer = layercls()
+    def test_revisions(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         for data in datas:
@@ -89,8 +109,7 @@ class TestLayer:
             assert layer.revisions(data.primary_key)[1] is data
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_purge(self, layercls, raws):
-        layer = layercls()
+    def test_purge(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         for data in datas:
