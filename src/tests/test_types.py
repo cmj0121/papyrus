@@ -1,4 +1,5 @@
 import os
+import random
 import time
 
 import pytest
@@ -61,6 +62,15 @@ class TestUniqueID:
     def test_too_large_key_type(self):
         with pytest.raises(ValueError):
             UniqueID(UniqueID.MAX + 1)
+
+    @pytest.mark.parametrize("size", [10, 100, 1000])
+    def test_sortable(self, size: int):
+        raws = sorted([UniqueID.new() for _ in range(size)])
+        data = raws[:]
+        random.shuffle(data)
+
+        assert raws == sorted(raws)
+        assert raws == sorted(data)
 
 
 class TestKeyType:
@@ -141,6 +151,14 @@ class TestKey:
 
         assert x < y
 
+    @pytest.mark.parametrize("size", [10, 100, 1000])
+    def test_sortable(self, size: int):
+        raws = sorted([Key(i) for i in range(size)])
+        data = raws[:]
+        random.shuffle(data)
+
+        assert raws == sorted(raws)
+        assert raws == sorted(data)
 
 
 class TestSerializable:
