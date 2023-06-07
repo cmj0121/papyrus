@@ -8,6 +8,9 @@ import time
 from typing import Any
 from typing import Generator
 
+from ._base import Deserializable
+from ._base import Serializable
+
 
 class CrockfordBase32:
     """the Crockford's Base32 algo"""
@@ -35,7 +38,7 @@ class CrockfordBase32:
         return
 
 
-class UniqueID:
+class UniqueID(Serializable, Deserializable):
     """
     The UniqueID is the 128-bit unsigned integer.
 
@@ -145,6 +148,18 @@ class UniqueID:
         """get the process id."""
         return (self._key >> 72) & 0xFF
 
+    def to_bytes(self) -> bytes:
+        """convert the key to bytes."""
+        byteorder = "big"
+        return self._key.to_bytes(16, byteorder=byteorder)
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> UniqueID:
+        """convert the bytes to the key."""
+        byteorder = "big"
+        raw = int.from_bytes(data, byteorder=byteorder)
+        return cls(raw)
+
 
 class KeyType(enum.Enum):
     BOOL = 0    # the truth value, 1 byte
@@ -166,7 +181,7 @@ class KeyType(enum.Enum):
             case _:
                 raise NotImplementedError(f"unknown key type: {other}")
 
-    def __len__(self):
+    def cap(self):
         match self:
             case KeyType.BOOL:
                 return 1
@@ -198,7 +213,14 @@ class KeyType(enum.Enum):
                 raise NotImplementedError(f"unknown key type: {raw}")
 
 
-class Key:
+class Key(Serializable, Deserializable):
+    """
+    The known data length and pre-defined type key.
+
+    It can be used as the primary key and the searchable index of data in the storage.
+    At the same time, it can convert the key into the binary format with the fixed length,
+    and convert from the binary format to the key.
+    """
     def __init__(self, raw: Any, ktype: KeyType | None = None):
         self._raw = raw
         self._ktype = KeyType.detect(raw) if ktype is None else ktype
@@ -261,3 +283,39 @@ class Key:
                 return Key(str(self.value), ktype)
             case _:
                 raise NotImplementedError(f"unknown key type: {ktype}")
+
+    def to_bytes(self) -> bytes:
+        match self.ktype:
+            case KeyType.BOOL:
+                return int(self.value).to_bytes(self.ktype.cap(), byteorder="big", signed=True)
+            case KeyType.BYTE | KeyType.INT:
+                return self.value.to_bytes(self.ktype.cap(), byteorder="big", signed=True)
+            case KeyType.STR | KeyType.TEXT:
+                data = self.value.encode("utf-8")
+                data = data + b"\x00" * (self.ktype.cap() - len(data))
+                return data
+            case _:
+                raise NotImplementedError(f"unknown key type: {self.ktype}")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Key:
+        match len(data):
+            case 1:
+                raw = bool(int.from_bytes(data, byteorder="big", signed=True))
+                ktype = KeyType.BOOL
+            case 2:
+                raw = int.from_bytes(data, byteorder="big", signed=True)
+                ktype = KeyType.BYTE
+            case 16:
+                raw = int.from_bytes(data, byteorder="big", signed=True)
+                ktype = KeyType.INT
+            case 64:
+                raw = data.decode("utf-8").rstrip("\x00")
+                ktype = KeyType.STR
+            case 256:
+                raw = data.decode("utf-8").rstrip("\x00")
+                ktype = KeyType.TEXT
+            case _:
+                raise NotImplementedError(f"unknown key type: {len(data)=}")
+
+        return cls(raw, ktype)
