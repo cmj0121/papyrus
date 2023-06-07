@@ -2,20 +2,10 @@
 from __future__ import annotations
 
 import abc
-from dataclasses import dataclass
 
+from papyrus.types import Data
 from papyrus.types import Key
 from papyrus.types import UniqueID
-
-
-@dataclass
-class Data:
-    """
-    The data is the composite of the key, the value and the searchable tags.
-    """
-    primary_key: Key
-
-    is_deleted: bool = False
 
 
 class BaseLayer(abc.ABC):
