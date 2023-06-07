@@ -255,6 +255,9 @@ class Key(Serializable, Deserializable):
             case _:
                 return self.value < other
 
+    def __hash__(self):
+        return hash(self.value)
+
     @property
     def raw(self) -> Any:
         return self._raw
