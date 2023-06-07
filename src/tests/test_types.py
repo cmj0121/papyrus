@@ -5,6 +5,8 @@ import pytest
 from papyrus.types import Key
 from papyrus.types import KeyType
 from papyrus.types import UniqueID
+from papyrus.types._base import Deserializable
+from papyrus.types._base import Serializable
 from papyrus.types.key import CrockfordBase32
 
 
@@ -138,3 +140,66 @@ class TestKey:
         y = Key(True)
 
         assert x < y
+
+
+
+class TestSerializable:
+    def test_serialize_without_impl(self):
+        class Test(Serializable):
+            pass
+
+        with pytest.raises(TypeError):
+            Test().to_bytes()
+
+    def test_uid(self):
+        uid = UniqueID.new()
+        data = uid.to_bytes()
+
+        assert len(data) == 16
+
+    def test_uid_nil(self):
+        uid = UniqueID(UniqueID.MIN)
+        data = uid.to_bytes()
+
+        assert len(data) == 16
+        assert data == b"\x00" * 16
+
+    def test_uid_max(self):
+        uid = UniqueID(UniqueID.MAX)
+        data = uid.to_bytes()
+
+        assert len(data) == 16
+        assert data == b"\xff" * 16
+
+    @pytest.mark.parametrize("ktype", KeyType)
+    def test_key(self, ktype):
+        key = Key(True).cast(ktype)
+        data = key.to_bytes()
+
+        assert len(data) == key.ktype.cap()
+
+
+class TestDeserializable:
+    def test_deserialize_without_impl(self):
+        class Test(Deserializable):
+            pass
+
+        with pytest.raises(TypeError):
+            Test().to_bytes()
+
+    def test_uid(self):
+        uid = UniqueID.new()
+        assert uid == UniqueID.from_bytes(uid.to_bytes())
+
+    def test_uid_nil(self):
+        uid = UniqueID(UniqueID.MIN)
+        assert uid == UniqueID.from_bytes(uid.to_bytes())
+
+    def test_uid_max(self):
+        uid = UniqueID(UniqueID.MAX)
+        assert uid == UniqueID.from_bytes(uid.to_bytes())
+
+    @pytest.mark.parametrize("ktype", KeyType)
+    def test_key(self, ktype):
+        key = Key(True).cast(ktype)
+        assert key == Key.from_bytes(key.to_bytes())
