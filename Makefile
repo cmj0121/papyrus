@@ -14,7 +14,8 @@ clean: $(SUBDIR)	# clean-up environment
 	@rm -rf dist/
 
 test: $(VENV)		# run test
-	$(POETRY) run pytest -v -n auto --cov=src/papyrus --no-cov-on-fail
+	$(POETRY) run pytest -n auto --cov=src/papyrus --no-cov-on-fail --benchmark-skip
+	$(POETRY) run pytest --benchmark-only --benchmark-name=short --benchmark-columns=min,mean,max,ops,outliers
 
 run:				# run in the local environment
 	$(POETRY) run papyrus
