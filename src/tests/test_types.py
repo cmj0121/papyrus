@@ -72,6 +72,17 @@ class TestUniqueID:
         assert raws == sorted(raws)
         assert raws == sorted(data)
 
+    def test_bench_new_uid(self, benchmark):
+        benchmark(UniqueID.new)
+
+    def test_bench_uid_serialize(self, benchmark):
+        uid = UniqueID.new()
+        benchmark(uid.to_bytes)
+
+    def test_bench_uid_deserialize(self, benchmark):
+        uid = UniqueID.new()
+        benchmark(UniqueID.from_bytes, uid.to_bytes())
+
 
 class TestKeyType:
     @pytest.mark.parametrize(
@@ -196,6 +207,31 @@ class TestSerializable:
 
         assert len(data) == key.ktype.cap()
 
+    @pytest.mark.parametrize(
+        "value", [
+            True,
+            False,
+            0,
+            1,
+            -1,
+            65535,
+            -65536,
+            2147483647,
+            -2147483648,
+            4294967295,
+            -4294967296,
+            9223372036854775807,
+            -9223372036854775808,
+            18446744073709551615,
+            -18446744073709551616,
+            "",
+            "a",
+        ],
+    )
+    def test_bench_key_serialize(self, benchmark, value):
+        key = Key(value)
+        benchmark(key.to_bytes)
+
 
 class TestDeserializable:
     def test_deserialize_without_impl(self):
@@ -221,3 +257,28 @@ class TestDeserializable:
     def test_key(self, ktype):
         key = Key(True).cast(ktype)
         assert key == Key.from_bytes(key.to_bytes())
+
+    @pytest.mark.parametrize(
+        "value", [
+            True,
+            False,
+            0,
+            1,
+            -1,
+            65535,
+            -65536,
+            2147483647,
+            -2147483648,
+            4294967295,
+            -4294967296,
+            9223372036854775807,
+            -9223372036854775808,
+            18446744073709551615,
+            -18446744073709551616,
+            "",
+            "a",
+        ],
+    )
+    def test_bench_key_deserialize(self, benchmark, value):
+        key = Key(value)
+        benchmark(key.from_bytes, key.to_bytes())
