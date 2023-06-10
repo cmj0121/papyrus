@@ -1,8 +1,8 @@
 import string
 
 import pytest
-from papyrus.layers import BaseLayer
 from papyrus.layers import Data
+from papyrus.layers import Layer
 from papyrus.types import Key
 from papyrus.types import UniqueID
 
@@ -17,11 +17,11 @@ class TestLayerRegister:
         ],
     )
     def test_available_layer(self, uri):
-        BaseLayer.open(uri)
+        Layer.open(uri)
 
     def test_unavailable_layer(self):
         with pytest.raises(KeyError):
-            BaseLayer.open("unknown://")
+            Layer.open("unknown://")
 
 
 @pytest.mark.parametrize(
@@ -40,7 +40,7 @@ class TestLayerBasic:
 
     @pytest.fixture
     def layer(self, uri):
-        layer = BaseLayer.open(uri, cached=False)
+        layer = Layer.open(uri, cached=False)
         yield layer
 
     def test_empty_layer(self, uri, layer):

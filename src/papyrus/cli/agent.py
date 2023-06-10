@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from argparse import Namespace
 from functools import cached_property
 
+from papyrus.layers import Layer
 from papyrus.settings import PROJ_NAME
 from papyrus.settings import Settings
 
@@ -22,7 +23,7 @@ class Agent:
     """
 
     help = "the embeddable, persistent, and revisions storage"
-    env = ".env"
+    env = ".env.yml"
 
     @classmethod
     def add_arguments(cls, parser: ArgumentParser):
@@ -40,7 +41,13 @@ class Agent:
     @cached_property
     def settings(self) -> Settings:
         """The global settings of Papyrus"""
-        return Settings(_env_file=self.env)
+        with open(self.env, encoding="utf-8") as fd:
+            return Settings.parse_raw(fd.read())
+
+    @cached_property
+    def layers(self) -> list[Layer]:
+        """The layers of Papyrus"""
+        return [Layer.open(name) for name in self.settings.LAYERS]
 
     def run(self, args: Namespace) -> int:
         """The main entry of Papyrus"""
@@ -64,14 +71,19 @@ class Agent:
         match verbose:
             case -1:
                 level = logging.CRITICAL
+                self.settings.log_level = "critical"
             case 0:
                 level = logging.ERROR
+                self.settings.log_level = "error"
             case 1:
                 level = logging.WARNING
+                self.settings.log_level = "warning"
             case 2:
                 level = logging.INFO
+                self.settings.log_level = "info"
             case _:
                 level = logging.DEBUG
+                self.settings.log_level = "debug"
 
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(level)
