@@ -1,5 +1,4 @@
 """The agent instance"""
-import enum
 import logging
 import sys
 from argparse import ArgumentParser
@@ -9,19 +8,9 @@ from functools import cached_property
 from papyrus.settings import PROJ_NAME
 from papyrus.settings import Settings
 
+from .commands import Command
+
 logger = logging.getLogger(PROJ_NAME)
-
-
-class Action(enum.Enum):
-    LIST = "list"
-    SETTINGS = "settings"
-
-    def __str__(self):
-        return self.value
-
-    @classmethod
-    def to_list(cls) -> list[str]:
-        return [str(action) for action in cls]
 
 
 class Agent:
@@ -43,7 +32,10 @@ class Agent:
         group.add_argument("-q", "--quiet", action="store_true", help="Silence the log")
         group.add_argument("-v", "--verbose", default=0, action="count", help="Show the verbose log")
 
-        parser.add_argument("action", type=Action, choices=Action, help="The action to perform")
+        subcmd = parser.add_subparsers(dest="action", required=True)
+        for name, command in Command.commands().items():
+            subparser = subcmd.add_parser(name, help=command.help)
+            command.add_arguments(subparser)
 
     @cached_property
     def settings(self) -> Settings:
@@ -54,25 +46,8 @@ class Agent:
         """The main entry of Papyrus"""
         self._prologue(args)
 
-        match args.action:
-            case Action.LIST:
-                # dump all the actions
-                print("\n".join(Action.to_list()))
-            case Action.SETTINGS:
-                for key, field in self.settings.__fields__.items():
-                    comment = field.field_info.description
-
-                    if comment:
-                        print(f"# {comment}")
-                        print(f"{key}={getattr(self.settings, key)}  # [default: {field.default}]")
-                        print()
-                    else:
-                        print(f"{key}={getattr(self.settings, key)}  # [default: {field.default}]")
-            case _:
-                logger.critical(f"the action `{args.action}` is not implemented")
-                return 1
-
-        return 0
+        command = Command.get_command(args.action)
+        return command().execute(self, args)
 
     def _prologue(self, args: Namespace):
         """setup the necessary environment and configuration before running the agent"""

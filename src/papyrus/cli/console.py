@@ -1,7 +1,8 @@
 import argparse
 
-from papyrus.agent import Agent
 from papyrus.settings import PROJ_NAME
+
+from .agent import Agent
 
 
 def main() -> int:
