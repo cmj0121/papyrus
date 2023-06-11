@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import abc
+from urllib.parse import ParseResult
 from urllib.parse import urlparse
 
 from papyrus.types import Data
@@ -17,6 +18,7 @@ class BaseLayer(abc.ABC):
     """
     # the necessary fields for the layer
     name: str | None = None
+    threshold: int | None = None
 
     # the registered layers
     _layers: dict[str, BaseLayer] = {}
@@ -33,16 +35,16 @@ class BaseLayer(abc.ABC):
         super().__init_subclass__(*args, **kwargs)
 
     @classmethod
-    def open(cls, url: str, /, cached: bool = True) -> BaseLayer:
+    def open(cls, url: str, threshold: int | None = None, /, cached: bool = True) -> BaseLayer:
         if url not in cls._instances or not cached:
             uri = urlparse(url)
 
             layer = BaseLayer._layers[uri.scheme]
 
             if not cached:
-                return layer(uri)
+                return layer(uri, threshold=threshold)
 
-            cls._instances[url] = layer(uri)
+            cls._instances[url] = layer(uri, threshold=threshold)
 
         return cls._instances[url]
 
@@ -57,6 +59,17 @@ class BaseLayer(abc.ABC):
             del cls._instances[name]
 
     # ======== the general methods related on the layer meta ======== #
+    @abc.abstractmethod
+    def __init__(self, /, uri: ParseResult | None = None, threshold: int | None = None):
+        """initialize the layer."""
+        self._uri = uri
+        self._threshold = threshold or self.threshold
+
+    @property
+    def url(self) -> str:
+        """the url of the layer."""
+        return self._uri.geturl()
+
     @abc.abstractmethod
     def __len__(self) -> int:
         """the number of available keys in the layer."""

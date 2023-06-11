@@ -23,6 +23,8 @@ class MemLayer(BaseLayer):
         self._keys: set[Key] = set()
         self._revisions: dict[Key, list[Data]] = {}
 
+        super().__init__(uri=uri)
+
     # ======== the general methods related on the layer meta ======== #
     def __len__(self) -> int:
         return len(self._keys)
@@ -70,7 +72,7 @@ class MemLayer(BaseLayer):
     def revisions(self, key: Key) -> list[Data]:
         """get all the revisions of data by the key."""
         data = self._revisions.get(key, [])
-        return data[::-1]
+        return list(data[::-1])
 
     # ======== the authorized methods related to danger operations ======== #
     def raw(self, uid: UniqueID) -> Data | None:
