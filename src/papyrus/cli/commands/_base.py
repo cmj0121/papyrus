@@ -26,8 +26,8 @@ class BaseCommand(abc.ABC):
         return cls._commands
 
     @classmethod
-    def get_command(cls, name: str) -> BaseCommand:
-        return cls._commands[name]
+    def get_command(cls, name: str) -> BaseCommand | None:
+        return cls._commands.get(name)
 
     # ======== the general methods to execute command ======== #
     @classmethod
