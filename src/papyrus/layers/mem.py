@@ -17,13 +17,13 @@ class MemLayer(BaseLayer):
     """
     name = "mem"
 
-    def __init__(self, /, uri: ParseResult | None = None):
+    def __init__(self, /, uri: ParseResult | None = None, threshold: int | None = None):
         self._mem: dict[UniqueID, Data] = {}
 
         self._keys: set[Key] = set()
         self._revisions: dict[Key, list[Data]] = {}
 
-        super().__init__(uri=uri)
+        super().__init__(uri=uri, threshold=threshold)
 
     # ======== the general methods related on the layer meta ======== #
     def __len__(self) -> int:
