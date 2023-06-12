@@ -217,7 +217,7 @@ class KeyType(enum.Enum):
             case str() if len(raw) < 256:
                 return KeyType.TEXT
             case _:
-                raise NotImplementedError(f"unknown key type: {raw}")
+                raise NotImplementedError(f"unknown key type: {raw} ({type(raw)}=)")
 
 
 class Key(Serializable, Deserializable):

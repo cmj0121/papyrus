@@ -62,6 +62,9 @@ class Value(Serializable, Deserializable):
             case _:
                 return self.raw == other
 
+    def __str__(self):
+        return self.raw
+
     @staticmethod
     def classify(raw: Any) -> ValueType:
         match raw:

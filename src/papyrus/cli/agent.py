@@ -9,12 +9,15 @@ from functools import cached_property
 from papyrus.settings import PROJ_NAME
 from papyrus.settings import Settings
 from papyrus.storage import Storage
+from papyrus.types import Data
+from papyrus.types import Key
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexer import RegexLexer
 from pygments.token import Keyword
+from pygments.token import Text
 
 from .commands import Command
 
@@ -23,6 +26,10 @@ logger = logging.getLogger(PROJ_NAME)
 
 class Action(enum.Enum):
     EXIT = "exit"
+    INSERT = "insert"
+    DELETE = "delete"
+    LATEST = "latest"
+    REVISIONS = "revisions"
 
     @classmethod
     def to_list(cls) -> list[str]:
@@ -32,9 +39,11 @@ class Action(enum.Enum):
 class PromptLexer(RegexLexer):
     tokens = {
         "root": [
-            (r"exit", Keyword),
             (r"list", Keyword),
             (r"dump_settings", Keyword),
+            *[(action.value, Keyword) for action in Action],
+            (r"\s+", Text.Whitespace),
+            (r"\w+", Text),
         ],
     }
 
@@ -72,7 +81,8 @@ class Agent:
     @cached_property
     def storage(self) -> Storage:
         """The storage of Papyrus"""
-        return Storage(self.settings.layers)
+        storage = Storage.open(self.settings.layers)
+        return storage
 
     def _prologue(self, args: Namespace):
         """setup the necessary environment and configuration before running the agent"""
@@ -116,13 +126,12 @@ class Agent:
 
     @cached_property
     def session(self) -> PromptSession:
-        actions = Command.commands().keys()
+        actions = [*Command.commands().keys(), *Action.to_list()]
 
-        completer = WordCompleter([*actions, *Action.to_list()], ignore_case=True)
         session = PromptSession(
             auto_suggest=AutoSuggestFromHistory(),
             lexer=PygmentsLexer(PromptLexer),
-            completer=completer,
+            completer=WordCompleter(actions, ignore_case=True),
         )
         return session
 
@@ -138,14 +147,48 @@ class Agent:
 
     def _run(self, args) -> int:
         """run the agent REPL"""
+
+        lexer = PromptLexer()
         while True:
             try:
-                cmd = self.session.prompt("> ")
+                text = self.session.prompt("> ")
+                cmd, *args = list(lexer.get_tokens(text))
+
+                cmd = cmd[1]  # only get the command text
                 cmd = Action(cmd) if cmd in Action._value2member_map_ else cmd
 
+                if any(arg for typ, arg in args if typ not in (Text, Text.Whitespace)):
+                    print(f"[!] invalid command: {text}")
+                    continue
+
+                args = [arg for typ, arg in args if typ is Text]
                 match cmd:
                     case Action.EXIT:
                         break
+                    case Action.INSERT:
+                        match len(args):
+                            case 1:
+                                key, = args
+                                value = None
+                            case 2:
+                                key, value = args
+                            case _:
+                                print(f"[!] invalid command: {text}")
+                                continue
+
+                        self.storage.insert(Data(key, value=value))
+                    case Action.DELETE:
+                        for key in args:
+                            self.storage.delete(key)
+                    case Action.LATEST:
+                        for key in args:
+                            data = self.storage.latest(key)
+                            if data is not None and not data.is_deleted and data.value is not None:
+                                print(data.value)
+                    case Action.REVISIONS:
+                        for key in args:
+                            revisions = self.storage.revisions(Key(key))
+                            print([str(r) for r in revisions])
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:
@@ -162,6 +205,7 @@ class Agent:
                 break
             except Exception as err:
                 logger.critical(f"unhandled exception: {err}")
+                raise
                 return 1
 
         return 0
