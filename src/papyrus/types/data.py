@@ -22,5 +22,16 @@ class Data:
         self.value = Value(value) if value else None
         self.is_deleted = is_deleted
 
-    def __str__(self) -> str:
-        return f"{self.value} [{self.is_deleted=}]"
+    def __repr__(self):
+        return f"{self.sign} {self.primary_key} {self.value or ''}".strip()
+
+    def __str__(self):
+        return f"{self.sign} {self.value or ''}".strip()
+
+    @property
+    def sign(self) -> str:
+        match self.is_deleted:
+            case True:
+                return "[-]"
+            case False:
+                return "[+]"

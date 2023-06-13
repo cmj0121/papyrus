@@ -3,6 +3,7 @@ import random
 import time
 
 import pytest
+from papyrus.types import Data
 from papyrus.types import Key
 from papyrus.types import KeyType
 from papyrus.types import UniqueID
@@ -306,3 +307,16 @@ class TestValue:
         assert value.vtype == ValueType.BIN
         assert len(value) == len(raw)
         assert value == Value.from_bytes(value.to_bytes())
+
+
+class TestData:
+    @pytest.mark.parametrize(
+        "data,expected_repr,expected_str", [
+            (Data("a", value=None, is_deleted=False), "[+] a", "[+]"),
+            (Data("a", value="test", is_deleted=False), "[+] a test", "[+] test"),
+            (Data("a", value=None, is_deleted=True), "[-] a", "[-]"),
+        ],
+    )
+    def test_data_repr(self, data, expected_repr, expected_str):
+        assert repr(data) == expected_repr
+        assert str(data) == expected_str
