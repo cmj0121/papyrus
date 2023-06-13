@@ -145,13 +145,19 @@ class Agent:
 
         return self._run(args)
 
+    def get_text(self) -> str:
+        if sys.stdin.isatty():
+            return self.session.prompt("> ")
+
+        return input()
+
     def _run(self, args) -> int:
         """run the agent REPL"""
 
         lexer = PromptLexer()
         while True:
             try:
-                text = self.session.prompt("> ")
+                text = self.get_text()
                 cmd, *args = list(lexer.get_tokens(text))
 
                 cmd = cmd[1]  # only get the command text
