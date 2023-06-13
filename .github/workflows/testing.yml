@@ -43,3 +43,4 @@ jobs:
         run: |
           poetry run pytest -n auto --cov=src/papyrus --no-cov-on-fail --benchmark-skip
           poetry run pytest --benchmark-only --benchmark-name=short --benchmark-columns=min,mean,max,ops,outliers
+          poetry run behave --logcapture src/features
