@@ -62,9 +62,6 @@ class Value(Serializable, Deserializable):
             case _:
                 return self.raw == other
 
-    def __repr__(self):
-        return f"<Value> {self.raw:12s}"
-
     def __str__(self):
         return self.raw
 
@@ -76,7 +73,7 @@ class Value(Serializable, Deserializable):
             case bytes():
                 return ValueType.BIN
             case _:
-                raise NotImplementedError(f"cannot classify {raw}")
+                raise NotImplementedError(f"cannot classify {raw} ({type(raw)}=)")
 
     @property
     def vtype(self) -> ValueType:

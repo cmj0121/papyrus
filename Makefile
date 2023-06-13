@@ -2,7 +2,7 @@ include Makefile.in
 
 SUBDIR :=
 
-.PHONY: all clean test stress run build install upgrade help $(SUBDIR)
+.PHONY: all clean test stress bdd run build install upgrade help $(SUBDIR)
 
 all: $(SUBDIR) 		# default action
 	@[ -f .git/hooks/pre-commit ] || pre-commit install --install-hooks
@@ -18,6 +18,9 @@ test: $(VENV)		# run test
 
 stress: $(VENV)		# run stress test
 	$(POETRY) run pytest --benchmark-only --benchmark-name=short --benchmark-columns=min,mean,max,ops,outliers
+
+bdd: $(VENV)		# run the BDD test
+	$(POETRY) run behave --logcapture src/features
 
 run:				# run in the local environment
 	$(POETRY) run papyrus

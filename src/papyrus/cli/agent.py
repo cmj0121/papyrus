@@ -194,7 +194,8 @@ class Agent:
                     case Action.REVISION:
                         for key in args:
                             revision = self.storage.revision(Key(key))
-                            print([str(r) for r in revision])
+                            revision = "\n".join(map(str, revision))
+                            print(revision)
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:
