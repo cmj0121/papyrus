@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from papyrus.layers import Layer
+from papyrus.settings import LayerSettings
 from papyrus.types import Data
 from papyrus.types import Key
 from papyrus.types import UniqueID
@@ -6,7 +9,12 @@ from papyrus.types import UniqueID
 
 class Storage:
     def __init__(self, layers: list[str], /, cached: bool = False):
-        self._layers = [Layer.open(name, cached=cached) for name in layers]
+        self._layers = [Layer.open(uri, cached=cached) for uri in layers]
+
+    @classmethod
+    def open(cls, settings: LayerSettings) -> Storage:
+        uris = [layer.uri for layer in settings]
+        return cls(uris)
 
     @property
     def layer(self) -> Layer:
@@ -31,7 +39,7 @@ class Storage:
         """get the latest data of the key"""
         return self.layer.latest(key)
 
-    def revisions(self, key: Key) -> list[Data]:
-        """get all revisions of the key"""
-        revisions = [r for layer in self.layers for r in layer.revisions(key)]
-        return revisions
+    def revision(self, key: Key) -> list[Data]:
+        """get all revision of the key"""
+        revision = [r for layer in self.layers for r in layer.revision(key)]
+        return revision

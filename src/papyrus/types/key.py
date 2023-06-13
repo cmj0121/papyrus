@@ -217,7 +217,7 @@ class KeyType(enum.Enum):
             case str() if len(raw) < 256:
                 return KeyType.TEXT
             case _:
-                raise NotImplementedError(f"unknown key type: {raw}")
+                raise NotImplementedError(f"unknown key type: {raw} ({type(raw)}=)")
 
 
 class Key(Serializable, Deserializable):
@@ -237,7 +237,7 @@ class Key(Serializable, Deserializable):
         return f"<Key #{self.ktype}> {self.value}"
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
     def __eq__(self, other):
         match other:

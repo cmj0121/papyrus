@@ -120,13 +120,13 @@ class BaseLayer(abc.ABC):
         raise NotImplementedError(f"{self.__class__.__name__} must implement latest()")
 
     @abc.abstractmethod
-    def revisions(self, key: Key) -> list[Data]:
+    def revision(self, key: Key) -> list[Data]:
         """
         the query operation
 
-        get all the revisions of data by the key. If the key is not in the layer, return an empty list.
+        get all the revision of data by the key. If the key is not in the layer, return an empty list.
         """
-        raise NotImplementedError(f"{self.__class__.__name__} must implement revisions()")
+        raise NotImplementedError(f"{self.__class__.__name__} must implement revision()")
 
     # ======== the authorized methods related to danger operations ======== #
     @abc.abstractmethod

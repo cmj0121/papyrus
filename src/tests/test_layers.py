@@ -94,19 +94,19 @@ class TestLayerBasic:
             assert layer.latest(data.primary_key) is None
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_revisions(self, layer, raws):
+    def test_revision(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         for data in datas:
-            assert layer.revisions(data.primary_key) == []
+            assert layer.revision(data.primary_key) == []
 
             layer.insert(data)
-            assert layer.revisions(data.primary_key) == [data]
+            assert layer.revision(data.primary_key) == [data]
 
             layer.delete(data.primary_key)
-            assert len(layer.revisions(data.primary_key)) == 2
-            assert layer.revisions(data.primary_key)[0].is_deleted is True
-            assert layer.revisions(data.primary_key)[1] is data
+            assert len(layer.revision(data.primary_key)) == 2
+            assert layer.revision(data.primary_key)[0].is_deleted is True
+            assert layer.revision(data.primary_key)[1] is data
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
     def test_purge(self, layer, raws):

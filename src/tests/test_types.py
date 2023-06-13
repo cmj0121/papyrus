@@ -3,12 +3,15 @@ import random
 import time
 
 import pytest
+from papyrus.types import Data
 from papyrus.types import Key
 from papyrus.types import KeyType
 from papyrus.types import UniqueID
+from papyrus.types import Value
 from papyrus.types._base import Deserializable
 from papyrus.types._base import Serializable
 from papyrus.types.key import CrockfordBase32
+from papyrus.types.value import ValueType
 
 
 class TestUniqueID:
@@ -282,3 +285,38 @@ class TestDeserializable:
     def test_bench_key_deserialize(self, benchmark, value):
         key = Key(value)
         benchmark(key.from_bytes, key.to_bytes())
+
+
+class TestValue:
+    def test_value_str(self, faker):
+        raw = faker.pystr()
+        value = Value(raw)
+
+        assert value == raw
+        assert value.raw == raw
+        assert value.vtype == ValueType.STR
+        assert len(value) == len(raw)
+        assert value == Value.from_bytes(value.to_bytes())
+
+    def test_value_bytes(self, faker):
+        raw = faker.binary()
+        value = Value(raw)
+
+        assert value == raw
+        assert value.raw == raw
+        assert value.vtype == ValueType.BIN
+        assert len(value) == len(raw)
+        assert value == Value.from_bytes(value.to_bytes())
+
+
+class TestData:
+    @pytest.mark.parametrize(
+        "data,expected_repr,expected_str", [
+            (Data("a", value=None, is_deleted=False), "[+] a", "[+]"),
+            (Data("a", value="test", is_deleted=False), "[+] a test", "[+] test"),
+            (Data("a", value=None, is_deleted=True), "[-] a", "[-]"),
+        ],
+    )
+    def test_data_repr(self, data, expected_repr, expected_str):
+        assert repr(data) == expected_repr
+        assert str(data) == expected_str

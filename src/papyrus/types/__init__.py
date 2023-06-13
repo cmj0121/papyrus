@@ -1,8 +1,8 @@
-from dataclasses import dataclass
-
+from .data import Data
 from .key import Key
 from .key import KeyType
 from .key import UniqueID
+from .value import Value
 
 
 __all__ = [
@@ -10,14 +10,6 @@ __all__ = [
     "Key",
     "KeyType",
     "UniqueID",
+    "Value",
+    "Data",
 ]
-
-
-@dataclass
-class Data:
-    """
-    The data is the composite of the key, the value and the searchable tags.
-    """
-    primary_key: Key
-
-    is_deleted: bool = False
