@@ -62,6 +62,9 @@ class Value(Serializable, Deserializable):
             case _:
                 return self.raw == other
 
+    def __repr__(self):
+        return f"<Value> {self.raw:12s}"
+
     def __str__(self):
         return self.raw
 

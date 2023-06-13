@@ -39,7 +39,7 @@ class Storage:
         """get the latest data of the key"""
         return self.layer.latest(key)
 
-    def revisions(self, key: Key) -> list[Data]:
-        """get all revisions of the key"""
-        revisions = [r for layer in self.layers for r in layer.revisions(key)]
-        return revisions
+    def revision(self, key: Key) -> list[Data]:
+        """get all revision of the key"""
+        revision = [r for layer in self.layers for r in layer.revision(key)]
+        return revision

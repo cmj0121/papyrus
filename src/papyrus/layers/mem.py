@@ -21,7 +21,7 @@ class MemLayer(BaseLayer):
         self._mem: dict[UniqueID, Data] = {}
 
         self._keys: set[Key] = set()
-        self._revisions: dict[Key, list[Data]] = {}
+        self._revision: dict[Key, list[Data]] = {}
 
         super().__init__(uri=uri, threshold=threshold)
 
@@ -50,7 +50,7 @@ class MemLayer(BaseLayer):
         self._mem[uid] = data
 
         self._keys.add(data.primary_key)
-        self._revisions[data.primary_key] = self._revisions.get(data.primary_key, []) + [data]
+        self._revision[data.primary_key] = self._revision.get(data.primary_key, []) + [data]
 
         return uid
 
@@ -65,14 +65,14 @@ class MemLayer(BaseLayer):
 
     def latest(self, key: Key) -> Data | None:
         """get the latest data by the key."""
-        data = self._revisions.get(key, [])
+        data = self._revision.get(key, [])
         data = data[-1] if data else None
         return data if (data is None or not data.is_deleted) else None
 
-    def revisions(self, key: Key) -> list[Data]:
-        """get all the revisions of data by the key."""
-        data = self._revisions.get(key, [])
-        return list(data[::-1])
+    def revision(self, key: Key) -> list[Data]:
+        """get all the revision of data by the key."""
+        data = self._revision.get(key, [])
+        return data[::-1]
 
     # ======== the authorized methods related to danger operations ======== #
     def raw(self, uid: UniqueID) -> Data | None:
@@ -81,9 +81,9 @@ class MemLayer(BaseLayer):
 
     def purge(self):
         """remove all the data that is marked as deleted."""
-        self._revisions = {
-            key: [r for r in revisions if not r.is_deleted]
-            for key, revisions in self._revisions.items() for key in self._keys
+        self._revision = {
+            key: [r for r in revision if not r.is_deleted]
+            for key, revision in self._revision.items() for key in self._keys
         }
 
         self._mem = {uid: data for uid, data in self._mem.items() if data.primary_key in self._keys}

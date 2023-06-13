@@ -29,7 +29,7 @@ class Action(enum.Enum):
     INSERT = "insert"
     DELETE = "delete"
     LATEST = "latest"
-    REVISIONS = "revisions"
+    REVISION = "revision"
 
     @classmethod
     def to_list(cls) -> list[str]:
@@ -56,7 +56,7 @@ class Agent:
     agent to interact with the data stored in Papyrus.
     """
 
-    help = "the embeddable, persistent, and revisions storage"
+    help = "the embeddable, persistent, and revision storage"
     env = ".env.yml"
 
     @classmethod
@@ -191,10 +191,10 @@ class Agent:
                             data = self.storage.latest(key)
                             if data is not None and not data.is_deleted and data.value is not None:
                                 print(data.value)
-                    case Action.REVISIONS:
+                    case Action.REVISION:
                         for key in args:
-                            revisions = self.storage.revisions(Key(key))
-                            print([str(r) for r in revisions])
+                            revision = self.storage.revision(Key(key))
+                            print([str(r) for r in revision])
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:

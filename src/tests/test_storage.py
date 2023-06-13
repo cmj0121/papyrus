@@ -31,10 +31,10 @@ class TestStorage:
             data = Data(key)
             storage.insert(data)
             assert storage.latest(key) == data
-            assert storage.revisions(key) == [data]
+            assert storage.revision(key) == [data]
 
             storage.insert(data)
-            assert len(storage.revisions(key)) == 2
+            assert len(storage.revision(key)) == 2
 
     def test_storage_insert_and_latest(self, storage):
         key = Key(True)
@@ -55,7 +55,7 @@ class TestStorage:
         storage.delete(key)
         assert storage.latest(key) is None
 
-    def test_storage_revisions(self, storage):
+    def test_storage_revision(self, storage):
         keys = [Key(True), Key(True), Key(True)]
         data = [Data(key) for key in keys]
 
@@ -64,4 +64,4 @@ class TestStorage:
             storage.insert(cur_data)
 
             assert storage.latest(key) == cur_data
-            assert len(storage.revisions(key)) == index + 1
+            assert len(storage.revision(key)) == index + 1
