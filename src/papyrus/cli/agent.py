@@ -87,6 +87,7 @@ class Agent:
 
     def _prologue(self, args: Namespace):
         """setup the necessary environment and configuration before running the agent"""
+        self.env = args.config or self.env
         self._setup_logger(quiet=args.quiet, verbose=args.verbose)
 
     def _setup_logger(self, /, quiet: bool = False, verbose: int = 0):
