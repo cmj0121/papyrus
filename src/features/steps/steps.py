@@ -10,6 +10,7 @@ from behave import then
 from behave import when
 from faker import Faker
 from papyrus.types import Data
+from papyrus.types import Key
 
 logger = logging.getLogger("bdd")
 
@@ -67,10 +68,22 @@ def step_load_papyrus_settings(context):
 
 @given("generate the random data as {name}")
 @given("generate the random data as {name} with {amount} amount")
-def step_generate_random_data(context, name, amount: str | None = None):
+@given("generate the random data as {name} with {amount} amount and tag {tname}={tvalue}")
+def step_generate_random_data(
+    context,
+    name,
+    amount: str | None = None,
+    tname: str | None = None,
+    tvalue: str | None = None,
+):
     fake = Faker()
     amount = int(amount or 1)
-    setattr(context, name, [Data(fake.pyint(), fake.pystr()) for _ in range(amount)])
+
+    tags = {}
+    if tname and tvalue:
+        tags[tname] = Key(tvalue)
+
+    setattr(context, name, [Data(fake.pyint(), fake.pystr(), tags=tags) for _ in range(amount)])
 
 
 @when("load the papyrus instance")
@@ -81,7 +94,8 @@ def step_load_papyrus_instance(context):
 @when("insert data {name} to the papyrus instance")
 def step_insert_data(context, name):
     for data in getattr(context, name):
-        context.proc.send(f"insert {data.primary_key} {data.value}")
+        tags = " ".join([f"{k}={v}" for k, v in data.tags.items()])
+        context.proc.send(f"insert {data.primary_key} {data.value} {tags}")
 
 
 @when("delete key from data {name} on the papyrus instance")
@@ -122,3 +136,15 @@ def test_check_data_within_revision(context, name, should_be):
         resp = context.proc.recv()
 
         assert f"[+] {data.value}" in resp.split("\n") if should_be else f"[+] {data.value}" not in resp.split("\n")
+
+
+@then("search tag {tname}={tvalue} and the data {name} primary key {should_be} belongs to the result")
+def test_check_primary_key_belongs_to_search_result(context, name, tname, tvalue, should_be):
+    assert should_be in ("should be", "should not be"), should_be
+    should_be = should_be == "should be"
+
+    for data in getattr(context, name):
+        context.proc.send(f"search {tname}={tvalue}")
+        resp = context.proc.recv()
+
+        assert str(data.primary_key) in resp.split("\n") if should_be else str(data.primary_key) not in resp.split("\n")
