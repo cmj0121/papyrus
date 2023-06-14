@@ -170,7 +170,7 @@ class UniqueID(Serializable, Deserializable):
 
 class KeyType(enum.Enum):
     BOOL = 0    # the truth value, 1 byte
-    BYTE = 1    # the signed integer, 2 byte
+    WORD = 1    # the signed integer, 2 byte
     INT = 2     # the signed integer, 16 byte
     STR = 3     # the 63-bytes null-end string
     TEXT = 4    # the 255-bytes arbitrary string
@@ -192,7 +192,7 @@ class KeyType(enum.Enum):
         match self:
             case KeyType.BOOL:
                 return 1
-            case KeyType.BYTE:
+            case KeyType.WORD:
                 return 2
             case KeyType.INT:
                 return 16
@@ -209,7 +209,7 @@ class KeyType(enum.Enum):
             case bool():
                 return KeyType.BOOL
             case int() if -32768 <= raw <= 32767:
-                return KeyType.BYTE
+                return KeyType.WORD
             case int():
                 return KeyType.INT
             case str() if len(raw) < 64:
@@ -217,7 +217,7 @@ class KeyType(enum.Enum):
             case str() if len(raw) < 256:
                 return KeyType.TEXT
             case _:
-                raise NotImplementedError(f"unknown key type: {raw}")
+                raise NotImplementedError(f"unknown key type: {raw} ({type(raw)}=)")
 
 
 class Key(Serializable, Deserializable):
@@ -234,10 +234,10 @@ class Key(Serializable, Deserializable):
         self._value = None
 
     def __repr__(self):
-        return f"<Key #{self.ktype}> {self.value}"
+        return f"<Key #{self.ktype} {self.value}>"
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
     def __eq__(self, other):
         match other:
@@ -272,7 +272,7 @@ class Key(Serializable, Deserializable):
             match self.ktype:
                 case KeyType.BOOL:
                     self._value = bool(self.raw)
-                case KeyType.BYTE | KeyType.INT:
+                case KeyType.WORD | KeyType.INT:
                     self._value = int(self.raw)
                 case KeyType.STR | KeyType.TEXT:
                     self._value = str(self.raw)
@@ -285,7 +285,7 @@ class Key(Serializable, Deserializable):
         match ktype:
             case KeyType.BOOL:
                 return Key(bool(self.value), ktype)
-            case KeyType.BYTE | KeyType.INT:
+            case KeyType.WORD | KeyType.INT:
                 return Key(int(self.value), ktype)
             case KeyType.STR | KeyType.TEXT if self.ktype == KeyType.BOOL:
                 return Key(str(int(self.value)), ktype)
@@ -298,7 +298,7 @@ class Key(Serializable, Deserializable):
         match self.ktype:
             case KeyType.BOOL:
                 return int(self.value).to_bytes(self.ktype.cap(), byteorder="big", signed=True)
-            case KeyType.BYTE | KeyType.INT:
+            case KeyType.WORD | KeyType.INT:
                 return self.value.to_bytes(self.ktype.cap(), byteorder="big", signed=True)
             case KeyType.STR | KeyType.TEXT:
                 data = self.value.encode("utf-8")
@@ -315,7 +315,7 @@ class Key(Serializable, Deserializable):
                 ktype = KeyType.BOOL
             case 2:
                 raw = int.from_bytes(data, byteorder="big", signed=True)
-                ktype = KeyType.BYTE
+                ktype = KeyType.WORD
             case 16:
                 raw = int.from_bytes(data, byteorder="big", signed=True)
                 ktype = KeyType.INT

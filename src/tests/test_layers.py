@@ -94,19 +94,19 @@ class TestLayerBasic:
             assert layer.latest(data.primary_key) is None
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_revisions(self, layer, raws):
+    def test_revision(self, layer, raws):
         datas = [Data(Key(key)) for key in raws]
 
         for data in datas:
-            assert layer.revisions(data.primary_key) == []
+            assert layer.revision(data.primary_key) == []
 
             layer.insert(data)
-            assert layer.revisions(data.primary_key) == [data]
+            assert layer.revision(data.primary_key) == [data]
 
             layer.delete(data.primary_key)
-            assert len(layer.revisions(data.primary_key)) == 2
-            assert layer.revisions(data.primary_key)[0].is_deleted is True
-            assert layer.revisions(data.primary_key)[1] is data
+            assert len(layer.revision(data.primary_key)) == 2
+            assert layer.revision(data.primary_key)[0].is_deleted is True
+            assert layer.revision(data.primary_key)[1] is data
 
     @pytest.mark.parametrize("raws", TEST_KEYS)
     def test_purge(self, layer, raws):
@@ -125,3 +125,38 @@ class TestLayerBasic:
             assert data.primary_key not in layer
             assert len(layer) == 0
             assert layer.cap == 0
+
+
+@pytest.mark.parametrize(
+    "uri", [
+        "mem://",
+    ],
+)
+class TestLayerSearch:
+    @pytest.fixture
+    def layer(self, uri):
+        layer = Layer.open(uri, cached=False)
+        yield layer
+
+    def test_search_nil_set(self, layer, data):
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key not in layer.search(tname, tvalue)
+
+    def test_search_key(self, layer, data):
+        layer.insert(data)
+
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key in layer.search(tname, tvalue)
+
+    def test_search_key_deleted(self, layer, data):
+        layer.insert(data)
+        layer.delete(data.primary_key)
+
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key not in layer.search(tname, tvalue)
+
+    def test_search_key_delete_non_exists_key(self, layer, data):
+        layer.delete(data.primary_key)
+
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key not in layer.search(tname, tvalue)

@@ -9,12 +9,15 @@ from functools import cached_property
 from papyrus.settings import PROJ_NAME
 from papyrus.settings import Settings
 from papyrus.storage import Storage
+from papyrus.types import Data
+from papyrus.types import Key
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.lexers import PygmentsLexer
 from pygments.lexer import RegexLexer
 from pygments.token import Keyword
+from pygments.token import Text
 
 from .commands import Command
 
@@ -23,6 +26,11 @@ logger = logging.getLogger(PROJ_NAME)
 
 class Action(enum.Enum):
     EXIT = "exit"
+    INSERT = "insert"
+    DELETE = "delete"
+    LATEST = "latest"
+    REVISION = "revision"
+    SEARCH = "search"
 
     @classmethod
     def to_list(cls) -> list[str]:
@@ -32,9 +40,11 @@ class Action(enum.Enum):
 class PromptLexer(RegexLexer):
     tokens = {
         "root": [
-            (r"exit", Keyword),
             (r"list", Keyword),
             (r"dump_settings", Keyword),
+            *[(action.value, Keyword) for action in Action],
+            (r"\s+", Text.Whitespace),
+            (r"[\w=]+", Text),
         ],
     }
 
@@ -47,7 +57,7 @@ class Agent:
     agent to interact with the data stored in Papyrus.
     """
 
-    help = "the embeddable, persistent, and revisions storage"
+    help = "the embeddable, persistent, and revision storage"
     env = ".env.yml"
 
     @classmethod
@@ -72,7 +82,8 @@ class Agent:
     @cached_property
     def storage(self) -> Storage:
         """The storage of Papyrus"""
-        return Storage(self.settings.layers)
+        storage = Storage.open(self.settings.layers)
+        return storage
 
     def _prologue(self, args: Namespace):
         """setup the necessary environment and configuration before running the agent"""
@@ -116,13 +127,12 @@ class Agent:
 
     @cached_property
     def session(self) -> PromptSession:
-        actions = Command.commands().keys()
+        actions = [*Command.commands().keys(), *Action.to_list()]
 
-        completer = WordCompleter([*actions, *Action.to_list()], ignore_case=True)
         session = PromptSession(
             auto_suggest=AutoSuggestFromHistory(),
             lexer=PygmentsLexer(PromptLexer),
-            completer=completer,
+            completer=WordCompleter(actions, ignore_case=True),
         )
         return session
 
@@ -136,16 +146,72 @@ class Agent:
 
         return self._run(args)
 
+    def get_text(self) -> str:
+        if sys.stdin.isatty():
+            return self.session.prompt("> ")
+
+        return input()
+
     def _run(self, args) -> int:
         """run the agent REPL"""
+
+        lexer = PromptLexer()
         while True:
             try:
-                cmd = self.session.prompt("> ")
+                text = self.get_text()
+                cmd, *args = list(lexer.get_tokens(text))
+
+                cmd = cmd[1]  # only get the command text
                 cmd = Action(cmd) if cmd in Action._value2member_map_ else cmd
 
+                if any(arg for typ, arg in args if typ not in (Text, Text.Whitespace)):
+                    print(f"[!] invalid command: {text}")
+                    continue
+
+                args = [arg for typ, arg in args if typ is Text]
                 match cmd:
                     case Action.EXIT:
                         break
+                    case Action.INSERT:
+                        match len(args):
+                            case 1:
+                                key, = args
+                                value = None
+                                tags = {}
+                            case 2:
+                                key, value = args
+                                tags = {}
+                            case _:
+                                key, value, *tags = args
+
+                                tags = [tag.split("=") for tag in tags]
+                                tags = {tag[0]: Key("=".join(tag[1:])) for tag in tags}
+
+                        self.storage.insert(Data(key, value=value, tags=tags))
+                    case Action.DELETE:
+                        for key in args:
+                            self.storage.delete(key)
+                    case Action.LATEST:
+                        for key in args:
+                            data = self.storage.latest(key)
+                            if data is not None and not data.is_deleted and data.value is not None:
+                                print(data.value)
+                    case Action.REVISION:
+                        for key in args:
+                            revision = self.storage.revision(Key(key))
+                            revision = "\n".join(map(str, revision))
+                            print(revision)
+                    case Action.SEARCH:
+                        match len(args):
+                            case 1:
+                                tname, tvalue = args[0].split("=")
+                                tvalue = Key(tvalue)
+                            case _:
+                                print(f"[!] invalid command: {text}")
+                                continue
+
+                        for key in self.storage.search(tname, tvalue):
+                            print(key)
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:

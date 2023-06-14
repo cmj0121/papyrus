@@ -36,6 +36,7 @@ pytest-xdist = "3.3.1"
 pytest-cov = "4.1.0"
 faker = "18.10.1"
 pytest-benchmark = "4.0.0"
+behave = "1.2.6"
 
 [build-system]
 requires = ["poetry-core"]
