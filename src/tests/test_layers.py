@@ -125,3 +125,38 @@ class TestLayerBasic:
             assert data.primary_key not in layer
             assert len(layer) == 0
             assert layer.cap == 0
+
+
+@pytest.mark.parametrize(
+    "uri", [
+        "mem://",
+    ],
+)
+class TestLayerSearch:
+    @pytest.fixture
+    def layer(self, uri):
+        layer = Layer.open(uri, cached=False)
+        yield layer
+
+    def test_search_nil_set(self, layer, data):
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key not in layer.search(tname, tvalue)
+
+    def test_search_key(self, layer, data):
+        layer.insert(data)
+
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key in layer.search(tname, tvalue)
+
+    def test_search_key_deleted(self, layer, data):
+        layer.insert(data)
+        layer.delete(data.primary_key)
+
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key not in layer.search(tname, tvalue)
+
+    def test_search_key_delete_non_exists_key(self, layer, data):
+        layer.delete(data.primary_key)
+
+        for tname, tvalue in data.tags.items():
+            assert data.primary_key not in layer.search(tname, tvalue)
