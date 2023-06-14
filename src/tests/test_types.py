@@ -136,7 +136,7 @@ class TestKey:
         key = Key(raw)
 
         assert key == raw
-        assert key.ktype == KeyType.BYTE
+        assert key.ktype == KeyType.WORD
 
     def test_integer_key(self, faker):
         raw = faker.pyint(min_value=32768, max_value=65535)
