@@ -65,3 +65,11 @@ class TestStorage:
 
             assert storage.latest(key) == cur_data
             assert len(storage.revision(key)) == index + 1
+
+    def test_storage_search(self, storage, data):
+        storage.insert(data)
+
+        assert storage.latest(data.primary_key) == data
+
+        for tkey, tvalue in data.tags.items():
+            assert data.primary_key in storage.search(tkey, tvalue)

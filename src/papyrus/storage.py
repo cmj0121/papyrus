@@ -43,3 +43,12 @@ class Storage:
         """get all revision of the key"""
         revision = [r for layer in self.layers for r in layer.revision(key)]
         return revision
+
+    def search(self, name: str, key: Key) -> set[Key]:
+        """get all possible key with the search tag"""
+        tags = set()
+
+        for layer in self.layers:
+            tags |= layer.search(name, key)
+
+        return tags

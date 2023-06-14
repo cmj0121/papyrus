@@ -234,7 +234,7 @@ class Key(Serializable, Deserializable):
         self._value = None
 
     def __repr__(self):
-        return f"<Key #{self.ktype}> {self.value}"
+        return f"<Key #{self.ktype} {self.value}>"
 
     def __str__(self):
         return str(self.value)
