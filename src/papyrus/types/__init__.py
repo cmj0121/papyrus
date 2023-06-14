@@ -11,5 +11,4 @@ __all__ = [
     "KeyType",
     "UniqueID",
     "Value",
-    "Data",
 ]

@@ -312,9 +312,13 @@ class TestValue:
 class TestData:
     @pytest.mark.parametrize(
         "data,expected_repr,expected_str", [
+            (Data("a"), "[+] a", "[+]"),
             (Data("a", value=None, is_deleted=False), "[+] a", "[+]"),
             (Data("a", value="test", is_deleted=False), "[+] a test", "[+] test"),
             (Data("a", value=None, is_deleted=True), "[-] a", "[-]"),
+            (Data("a", tags={"x": Key(True)}), "[+] a [x=True]", "[+]"),
+            (Data("a", tags={"y": Key(1), "x": Key(True)}), "[+] a [x=True, y=1]", "[+]"),
+            (Data("a", value="test", tags={"y": Key(1), "x": Key(True)}), "[+] a test [x=True, y=1]", "[+] test"),
         ],
     )
     def test_data_repr(self, data, expected_repr, expected_str):
