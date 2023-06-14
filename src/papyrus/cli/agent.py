@@ -30,6 +30,7 @@ class Action(enum.Enum):
     DELETE = "delete"
     LATEST = "latest"
     REVISION = "revision"
+    SEARCH = "search"
 
     @classmethod
     def to_list(cls) -> list[str]:
@@ -43,7 +44,7 @@ class PromptLexer(RegexLexer):
             (r"dump_settings", Keyword),
             *[(action.value, Keyword) for action in Action],
             (r"\s+", Text.Whitespace),
-            (r"\w+", Text),
+            (r"[\w=]+", Text),
         ],
     }
 
@@ -176,13 +177,17 @@ class Agent:
                             case 1:
                                 key, = args
                                 value = None
+                                tags = {}
                             case 2:
                                 key, value = args
+                                tags = {}
                             case _:
-                                print(f"[!] invalid command: {text}")
-                                continue
+                                key, value, *tags = args
 
-                        self.storage.insert(Data(key, value=value))
+                                tags = [tag.split("=") for tag in tags]
+                                tags = {tag[0]: Key("=".join(tag[1:])) for tag in tags}
+
+                        self.storage.insert(Data(key, value=value, tags=tags))
                     case Action.DELETE:
                         for key in args:
                             self.storage.delete(key)
@@ -196,6 +201,17 @@ class Agent:
                             revision = self.storage.revision(Key(key))
                             revision = "\n".join(map(str, revision))
                             print(revision)
+                    case Action.SEARCH:
+                        match len(args):
+                            case 1:
+                                tname, tvalue = args[0].split("=")
+                                tvalue = Key(tvalue)
+                            case _:
+                                print(f"[!] invalid command: {text}")
+                                continue
+
+                        for key in self.storage.search(tname, tvalue):
+                            print(key)
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:
@@ -212,7 +228,6 @@ class Agent:
                 break
             except Exception as err:
                 logger.critical(f"unhandled exception: {err}")
-                raise
                 return 1
 
         return 0
