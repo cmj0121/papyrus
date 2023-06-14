@@ -128,6 +128,11 @@ class BaseLayer(abc.ABC):
         """
         raise NotImplementedError(f"{self.__class__.__name__} must implement revision()")
 
+    @abc.abstractmethod
+    def search(self, name: str, key: Key) -> set[Key]:
+        """list all the keys by the search tag (named key)."""
+        raise NotImplementedError(f"{self.__class__.__name__} must implement search()")
+
     # ======== the authorized methods related to danger operations ======== #
     @abc.abstractmethod
     def raw(self, uid: UniqueID) -> Data | None:

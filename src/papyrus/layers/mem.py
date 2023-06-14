@@ -22,6 +22,7 @@ class MemLayer(BaseLayer):
 
         self._keys: set[Key] = set()
         self._revision: dict[Key, list[Data]] = {}
+        self._search: dict[str, dict[Key, set[Key]]] = {}
 
         super().__init__(uri=uri, threshold=threshold)
 
@@ -52,6 +53,11 @@ class MemLayer(BaseLayer):
         self._keys.add(data.primary_key)
         self._revision[data.primary_key] = self._revision.get(data.primary_key, []) + [data]
 
+        for tkey, tvalue in data.tags.items():
+            self._search[tkey] = self._search.get(tkey, {})
+            self._search[tkey][tvalue] = self._search[tkey].get(tvalue, set())
+            self._search[tkey][tvalue].add(data.primary_key)
+
         return uid
 
     def delete(self, key: Key) -> UniqueID:
@@ -60,6 +66,9 @@ class MemLayer(BaseLayer):
         uid = self.insert(data)
 
         self._keys.remove(key)
+        for tag in self._search.values():
+            for key_set in tag.values():
+                key_set.discard(key)
 
         return uid
 
@@ -73,6 +82,11 @@ class MemLayer(BaseLayer):
         """get all the revision of data by the key."""
         data = self._revision.get(key, [])
         return data[::-1]
+
+    def search(self, name: str, key: Key) -> set[Key]:
+        """list all the keys by the search tag (named key)."""
+        search_pool = self._search.get(name, {})
+        return search_pool.get(key, set())
 
     # ======== the authorized methods related to danger operations ======== #
     def raw(self, uid: UniqueID) -> Data | None:
