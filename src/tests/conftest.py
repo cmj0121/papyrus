@@ -1,23 +1,35 @@
+import random
+
 import pytest
-from papyrus.layers import Data
-from papyrus.types import Key
+from papyrus.types.key import Key
+from papyrus.types.key import KeyType
+from papyrus.types.value import Value
+from papyrus.types.value import ValueType
 
 
 @pytest.fixture
 def key(faker):
-    yield Key(faker.pyint())
+    ktype = random.choice(list(KeyType))
+
+    match ktype:
+        case KeyType.BOOL:
+            yield Key(faker.pybool(), ktype)
+        case KeyType.WORD | KeyType.INT | KeyType.UID:
+            yield Key(faker.pyint(), ktype)
+        case KeyType.STR | KeyType.TEXT:
+            yield Key(faker.pystr(), ktype)
 
 
 @pytest.fixture
 def value(faker):
-    yield faker.pystr()
+    vtype = random.choice(list(ValueType))
 
-
-@pytest.fixture
-def data(faker, key, value):
-    tags = {
-        faker.name(): Key(faker.pyint()),
-        faker.name(): Key(faker.pyint()),
-        faker.name(): Key(faker.pyint()),
-    }
-    yield Data(key, value=value, tags=tags)
+    match vtype:
+        case ValueType.NIL:
+            yield Value(None)
+        case ValueType.DEL:
+            yield Value(None, vtype)
+        case ValueType.RAW:
+            yield Value(faker.binary())
+        case ValueType.CMP:
+            yield Value(faker.binary(), vtype)
