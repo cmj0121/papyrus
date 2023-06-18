@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import enum
+import struct
 import zlib
 from typing import Any
 
@@ -12,8 +13,10 @@ from ._base import Serializable
 @enum.unique
 class ValueType(enum.Enum):
     """the type of the value."""
-    STR = 1
-    BIN = 2
+    NIL = 0
+    RAW = 1
+    CMP = 2
+    DEL = 3
 
     def __int__(self) -> int:
         return self.value
@@ -31,29 +34,47 @@ class Value(Serializable, Deserializable):
     the arbitrary length of the variable.
 
     The `Value` instance is the arbitrary length of the variable, which can store
-    any length of the data. It has four parts:
+    any length of the data. It has the following fields:
 
+        - type: the category of the value.
+        - size: the total size in bytes of the data.
+        - data: the stored data.
+        - padding: the padding bytes to align and make the total size is multiple of 32.
+        - checksum: the checksum of the data.
 
-    0         8        16       24       32
-    +--------+--------+--------+--------+
-    | vtype  |         length           |
-    +-----------------------------------+
-    ~           compressed data         ~
-    +-----------------------------------+
-    |              checksum             |
-    +-----------------------------------+
+    0        8       16     24      32
+    +-------+-------+-------+-------+
+    | type  |     size              |
+    +-------+-------+-------+-------+
+    ~             data              ~
+    +-------+-------+-------+-------+
+    ~             padding           ~
+    +-------+-------+-------+-------+
+    |             checksum          |
+    +-------+-------+-------+-------+
     """
 
-    def __init__(self, raw: Any):
-        self._vtype = Value.classify(raw)
+    def __init__(self, raw: bytes | None, vtype: ValueType | None = None):
         self._raw = raw
+        self._vtype = (ValueType.NIL if raw is None else ValueType.RAW) if vtype is None else vtype
+
+        if self.raw and len(self.raw) > 0x1000000:
+            self._vtype = ValueType.CMP
+
+    def __repr__(self):
+        return f"<Value: {self.vtype}> {self.raw}"
+
+    def __str__(self):
+        return f"{self.raw}"
 
     def __len__(self) -> int:
         match self.vtype:
-            case ValueType.STR | ValueType.BIN:
-                return len(self.raw)
+            case ValueType.NIL | ValueType.DEL:
+                return 0
+            case ValueType.RAW | ValueType.CMP:
+                return self._raw.__len__()
             case _:
-                raise NotImplementedError(f"cannot get length of {self.vtype}")
+                raise NotImplementedError(f"unknown value type: {self.vtype}")
 
     def __eq__(self, other):
         match other:
@@ -62,66 +83,76 @@ class Value(Serializable, Deserializable):
             case _:
                 return self.raw == other
 
-    def __str__(self):
-        return self.raw
-
-    @staticmethod
-    def classify(raw: Any) -> ValueType:
-        match raw:
-            case str():
-                return ValueType.STR
-            case bytes():
-                return ValueType.BIN
-            case _:
-                raise NotImplementedError(f"cannot classify {raw} ({type(raw)}=)")
-
     @property
     def vtype(self) -> ValueType:
+        """the category of the value."""
         return self._vtype
 
     @property
     def raw(self) -> Any:
+        """the stored data."""
         return self._raw
 
     @property
     def compressed_data(self) -> bytes:
-        match self.vtype:
-            case ValueType.STR:
-                return zlib.compress(self.raw.encode())
-            case ValueType.BIN:
-                return zlib.compress(self.raw)
-            case _:
-                raise NotImplementedError(f"cannot compress {self.vtype}")
-
-    def to_bytes(self) -> bytes:
-        data = ((int(self.vtype) << 24) | len(self)).to_bytes(4, "big")
-        data = data + self.compressed_data
-        data = data + zlib.adler32(data).to_bytes(4, "big")
-
-        return data
+        """get the compressed raw data."""
+        return zlib.compress(self.raw)
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> Value:
-        if len(data) < 4:
-            raise ValueError(f"the length of the data is too short: {len(data)=}")
+    def checksum(cls, data: bytes) -> int:
+        """calculate the checksum of the data."""
+        return zlib.adler32(data)
 
-        checksum = int.from_bytes(data[-4:], "big")
-        if checksum != zlib.adler32(data[:-4]):
-            raise ValueError(f"the checksum is not matched: {checksum=} <> {zlib.adler32(data[:-4])=}")
-
-        hdr = int.from_bytes(data[:4], "big")
-        vtype, length = ValueType(hdr >> 24), hdr & 0x00FFFFFF
-
-        raw = zlib.decompress(data[4:-4])
-        match vtype:
-            case ValueType.STR:
-                raw = raw.decode()
-            case ValueType.BIN:
-                pass
+    # ======== Serializable ========
+    def to_bytes(self) -> bytes:
+        """serialize the value to bytes."""
+        match self.vtype:
+            case ValueType.NIL | ValueType.DEL:
+                head = (int(self.vtype) << 24)
+                data = b""
+            case ValueType.RAW:
+                data = self.raw
+                head = (int(self.vtype) << 24) + len(data)
+            case ValueType.CMP:
+                data = self.compressed_data
+                head = (int(self.vtype) << 24) + len(data)
             case _:
-                raise NotImplementedError(f"cannot decompress {vtype}")
+                raise NotImplementedError(f"unknown value type: {self.vtype}")
 
-        if len(raw) != length:
-            raise ValueError(f"the length is not matched: {length=} <> {len(raw)=}")
+        payload = struct.pack(">I", head) + data
+        padding = b"\x00" * (32 - len(payload) % 32)
 
-        return cls(raw)
+        return payload + padding + struct.pack(">I", self.checksum(payload + padding))
+
+    # ======== Deserializable ========
+    @classmethod
+    def from_bytes(self, data: bytes) -> Value:
+        if len(data) < 32:
+            raise ValueError(f"invalid value length: {len(data)=} < 32")
+
+        head, = struct.unpack(">I", data[:4])
+        vtype, size = ValueType(head >> 24), head & 0xFFFFFF
+
+        if len(data) < size + 4:
+            raise ValueError(f"invalid value length: {len(data)=} < {size + 4=}")
+
+        payload = data[4:4 + size]
+        padding = 32 - (4 + size) % 32
+        checksum = data[4 + size + padding:]
+
+        if checksum != struct.pack(">I", self.checksum(data[:4 + size + padding])):
+            raise ValueError("invalid value checksum: {checksum=} != {self.checksum(data[:4 + size + padding])=}")
+
+        match vtype:
+            case ValueType.NIL:
+                value = Value(None)
+            case ValueType.DEL:
+                value = Value(None, vtype=ValueType.DEL)
+            case ValueType.RAW:
+                value = Value(payload)
+            case ValueType.CMP:
+                value = Value(zlib.decompress(payload), vtype=ValueType.CMP)
+            case _:
+                raise NotImplementedError(f"unknown value type: {vtype}")
+
+        return value
