@@ -37,7 +37,7 @@ class PapyrusInstance:
         self.proc.stdin.write(f"{cmd}\n".encode())
         self.proc.stdin.flush()
 
-    def recv(self, timeout=0.2) -> str:
+    def recv(self, timeout=0.7) -> str:
         lines = []
         start = time.monotonic_ns()
 
