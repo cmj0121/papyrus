@@ -70,7 +70,11 @@ class Value(Serializable, Deserializable):
         return f"<Value: {self.vtype}> {self.raw}"
 
     def __str__(self):
-        return f"{self.raw}"
+        match self.is_deleted:
+            case True:
+                return f"{self.raw} (deleted)"
+            case False:
+                return f"{self.raw}"
 
     def __len__(self) -> int:
         match self.vtype:
@@ -90,7 +94,6 @@ class Value(Serializable, Deserializable):
 
     def delete(self):
         """mark the value as deleted."""
-        self._raw = None
         self._vtype = ValueType.DEL
 
     @property

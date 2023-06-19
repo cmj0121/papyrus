@@ -6,10 +6,10 @@ from argparse import ArgumentParser
 from argparse import Namespace
 from functools import cached_property
 
+from papyrus.layers import DuplicateKey
 from papyrus.settings import PROJ_NAME
 from papyrus.settings import Settings
 from papyrus.storage import Storage
-from papyrus.types import Data
 from papyrus.types import Key
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -28,9 +28,7 @@ class Action(enum.Enum):
     EXIT = "exit"
     INSERT = "insert"
     DELETE = "delete"
-    LATEST = "latest"
-    REVISION = "revision"
-    SEARCH = "search"
+    QUERY = "query"
 
     @classmethod
     def to_list(cls) -> list[str]:
@@ -82,7 +80,7 @@ class Agent:
     @cached_property
     def storage(self) -> Storage:
         """The storage of Papyrus"""
-        storage = Storage.open(self.settings.layers)
+        storage = Storage(self.settings.layers, default_layer=self.settings.default_layer)
         return storage
 
     def _prologue(self, args: Namespace):
@@ -188,31 +186,15 @@ class Agent:
                                 tags = [tag.split("=") for tag in tags]
                                 tags = {tag[0]: Key("=".join(tag[1:])) for tag in tags}
 
-                        self.storage.insert(Data(key, value=value, tags=tags))
+                        self.storage.insert(key, value)
                     case Action.DELETE:
                         for key in args:
                             self.storage.delete(key)
-                    case Action.LATEST:
+                    case Action.QUERY:
                         for key in args:
-                            data = self.storage.latest(key)
-                            if data is not None and not data.is_deleted and data.value is not None:
-                                print(data.value)
-                    case Action.REVISION:
-                        for key in args:
-                            revision = self.storage.revision(Key(key))
-                            revision = "\n".join(map(str, revision))
-                            print(revision)
-                    case Action.SEARCH:
-                        match len(args):
-                            case 1:
-                                tname, tvalue = args[0].split("=")
-                                tvalue = Key(tvalue)
-                            case _:
-                                print(f"[!] invalid command: {text}")
-                                continue
-
-                        for key in self.storage.search(tname, tvalue):
-                            print(key)
+                            value = self.storage.query(key)
+                            if value is not None:
+                                print(value)
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:
@@ -227,6 +209,8 @@ class Agent:
                 continue
             except EOFError:
                 break
+            except DuplicateKey:
+                logger.error(f"duplicate key: {key}")
             except Exception as err:
                 logger.critical(f"unhandled exception: {err}")
                 return 1

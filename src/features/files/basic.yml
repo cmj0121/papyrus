@@ -3,4 +3,4 @@ log_level: info
 
 layers:
   - name: memory layer
-    uri: mem://
+    uri: mem://test

@@ -12,7 +12,6 @@ Feature: Basic I/O
     Given generate the random data as VAR with <amount> amount
     When insert data VAR to the papyrus instance
     Then the data VAR should be exists in the papyrus instance
-    And the data VAR should be within the revision in the papyrus instance
 
     Examples: random data amount
       | amount |
@@ -24,7 +23,6 @@ Feature: Basic I/O
     When insert data VAR to the papyrus instance
     And delete key from data VAR on the papyrus instance
     Then the data VAR should not be exists in the papyrus instance
-    And the data VAR should be within the revision in the papyrus instance
 
     Examples: random data amount
       | amount |
