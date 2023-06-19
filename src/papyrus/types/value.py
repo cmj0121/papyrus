@@ -159,7 +159,7 @@ class Value(Serializable, Deserializable):
         checksum = data[4 + size + padding:]
 
         if checksum != struct.pack(">I", self.checksum(data[:4 + size + padding])):
-            raise ValueError("invalid value checksum: {checksum=} != {self.checksum(data[:4 + size + padding])=}")
+            raise ValueError(f"invalid value checksum: {checksum=} != {self.checksum(data[:4 + size + padding])=}")
 
         match vtype:
             case ValueType.NIL:
