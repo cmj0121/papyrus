@@ -1,54 +1,113 @@
-from __future__ import annotations
+from typing import Any
+from typing import Generator
 
 from papyrus.layers import Layer
+from papyrus.layers import ThresholdLimit
 from papyrus.settings import LayerSettings
-from papyrus.types import Data
 from papyrus.types import Key
-from papyrus.types import UniqueID
+from papyrus.types import Value
 
 
 class Storage:
-    def __init__(self, layers: list[str], /, cached: bool = False):
-        self._layers = [Layer.open(uri, cached=cached) for uri in layers]
+    """
+    the pseudo layer storage of Papyrus.
 
-    @classmethod
-    def open(cls, settings: LayerSettings) -> Storage:
-        uris = [layer.uri for layer in settings]
-        return cls(uris)
+    the storage is a pseudo layer, which contains multiple layers, serve the incoming request
+    as the normal layer.
+    """
+    def __init__(self, settings: LayerSettings, /, default_layer: LayerSettings | None = None, cached: bool = False):
+        self._layers = [
+            Layer.open(
+                setting.uri,
+                threshold=setting.threshold,
+                cached=cached,
+            ) for setting in settings
+        ]
 
-    @property
-    def layer(self) -> Layer:
-        """the available layer of storage"""
-        return self._layers[0]
+        self._default_layer = None
+        if default_layer is not None:
+            self._default_layer = Layer.open(
+                url=default_layer.uri,
+                threshold=default_layer.threshold,
+                cached=cached,
+            )
+
+    def __len__(self) -> int:
+        return self.count()
 
     @property
     def layers(self) -> list[Layer]:
-        """the available layers of storage"""
+        """list all the exists layers."""
         return self._layers
 
-    # ======== the general methods related to data operations ======== #
-    def insert(self, data: Data) -> UniqueID:
-        """insert a new data into the storage"""
-        return self.layer.insert(data)
+    @property
+    def layer(self) -> Layer:
+        """the first available layer."""
+        for layer in self.layers:
+            if not layer.is_full:
+                return layer
 
-    def delete(self, key: Key) -> UniqueID:
-        """delete a data from the storage"""
+        if self.default_layer is not None:
+            layer = self.default_layer.dup()
+            self._layers.append(layer)
+            return layer
+
+        raise ThresholdLimit("all layers are full")
+
+    @property
+    def default_layer(self) -> Layer | None:
+        """the default layer."""
+        return self._default_layer
+
+    # ======== the general methods related on the layer meta ======== #
+    def __contains__(self, key: Any) -> bool:
+        """check the key is exists in the layer."""
+        return any(key in layer for layer in self.layers)
+
+    # ======== the general methods related to data operations ======== #
+    def count(self) -> int:
+        """
+        The total number of items that the layer already hold.
+        """
+        return sum(layer.count() for layer in self.layers)
+
+    @property
+    def capacity(self) -> int:
+        """
+        The total number of items that the layer already hold, include the data
+        that is marked as deleted.
+        """
+        return sum(layer.capacity for layer in self.layers)
+
+    def insert(self, key: Key, value: Value, /, force: bool = False) -> Value | None:
+        """call the insert method of the layer."""
+        return self.layer.insert(key, value, force=force)
+
+    def delete(self, key: Key) -> bool:
+        """call the delete method of the layer."""
         return self.layer.delete(key)
 
-    def latest(self, key: Key) -> Data | None:
-        """get the latest data of the key"""
-        return self.layer.latest(key)
-
-    def revision(self, key: Key) -> list[Data]:
-        """get all revision of the key"""
-        revision = [r for layer in self.layers for r in layer.revision(key)]
-        return revision
-
-    def search(self, name: str, key: Key) -> set[Key]:
-        """get all possible key with the search tag"""
-        tags = set()
-
+    def query(self, key: Key) -> Value | None:
         for layer in self.layers:
-            tags |= layer.search(name, key)
+            value = layer.query(key)
+            if value is not None:
+                return value
 
-        return tags
+        return None
+
+    # ======== the iteration methods related to data operations ======== #
+    def iterate(self, /, desc: bool = True, based: Any = None) -> Generator[tuple[Key, Value], None, None]:
+        """call the iterate method of the layer."""
+        for layer in self.layers:
+            yield from layer.iterate(desc=desc, based=based)
+
+    # ======== the authorized methods related to danger operations ======== #
+    def purge(self):
+        """call the purge method of the layer."""
+        for layer in self.layers:
+            layer.purge()
+
+    def unlink(self):
+        """call the unlink method of the layer."""
+        for layer in self.layers:
+            layer.unlink()

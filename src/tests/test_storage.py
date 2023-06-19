@@ -1,75 +1,84 @@
+from functools import cache
+from pathlib import Path
+
 import pytest
+from papyrus.layers import DuplicateKey
+from papyrus.settings import Settings
 from papyrus.storage import Storage
-from papyrus.types import Data
-from papyrus.types import Key
 
 
-@pytest.mark.parametrize(
-    "layers", [
-        ["mem://test"],
-    ],
-)
+@cache
+def load_testing_config() -> list[Settings]:
+    """load the testing config"""
+    config_path = Path(__file__).parent.parent / "features/files"
+
+    settings = []
+    for path in config_path.glob("*.yml"):
+        with path.open("r") as fd:
+            settings.append(Settings.parse_raw(fd.read()))
+
+    return settings
+
+
+@pytest.mark.parametrize("config", load_testing_config())
 class TestStorage:
-    def test_storage_init(self, layers):
-        storage = Storage(layers, cached=False)
-
-        assert len(storage.layers) == len(layers)
-        assert storage.layer.url == layers[0]
-
     @pytest.fixture
-    def storage(self, layers):
-        storage = Storage(layers, cached=False)
-        yield storage
+    def storage(self, config) -> Storage:
+        """the storage instance"""
+        return Storage(config.layers, default_layer=config.default_layer, cached=False)
 
-    @pytest.mark.parametrize("size", [10, 64, 1024])
-    def test_storage_insert_multi(self, storage, size):
-        keys = [Key(n) for n in range(size)]
+    def test_empty_storage(self, storage):
+        assert len(storage) == 0
+        assert storage.capacity == 0
+        assert not storage.layer.is_full
+        assert storage.layers
 
-        for key in keys:
-            assert storage.latest(key) is None
+    def test_storage_insert(self, storage, key, value):
+        storage.insert(key, value)
 
-            data = Data(key)
-            storage.insert(data)
-            assert storage.latest(key) == data
-            assert storage.revision(key) == [data]
+        assert len(storage) == 1
+        assert storage.capacity == 1
+        assert storage.query(key) == value
 
-            storage.insert(data)
-            assert len(storage.revision(key)) == 2
+    def test_storage_insert_exists(self, storage, key, value, value2):
+        storage.insert(key, value)
 
-    def test_storage_insert_and_latest(self, storage):
-        key = Key(True)
-        data = Data(key)
+        with pytest.raises(DuplicateKey):
+            storage.insert(key, value2)
 
-        assert storage.latest(key) is None
+        assert len(storage) == 1
+        assert storage.capacity == 1
+        assert storage.query(key) == value
 
-        storage.insert(data)
-        assert storage.latest(key) == data
+    def test_storage_insert_force(self, storage, key, value, value2):
+        storage.insert(key, value)
+        storage.insert(key, value2, force=True)
 
-    def test_storage_delete_and_latest(self, storage):
-        key = Key(True)
-        data = Data(key)
+        assert len(storage) == 1
+        assert storage.capacity == 1
+        assert storage.query(key) == value2
 
-        storage.insert(data)
-        assert storage.latest(key) == data
-
+    def test_storage_delete(self, storage, key, value):
+        storage.insert(key, value)
         storage.delete(key)
-        assert storage.latest(key) is None
 
-    def test_storage_revision(self, storage):
-        keys = [Key(True), Key(True), Key(True)]
-        data = [Data(key) for key in keys]
+        assert len(storage) == 0
+        assert storage.capacity == 1
+        assert storage.query(key).is_deleted
 
-        for index, key in enumerate(keys):
-            cur_data = data[index]
-            storage.insert(cur_data)
+    def test_storage_purge(self, storage, key, value):
+        storage.insert(key, value)
+        storage.delete(key)
+        storage.purge()
 
-            assert storage.latest(key) == cur_data
-            assert len(storage.revision(key)) == index + 1
+        assert len(storage) == 0
+        assert storage.capacity == 0
+        assert storage.query(key) is None
 
-    def test_storage_search(self, storage, data):
-        storage.insert(data)
+    def test_storage_unlink(self, storage, key, value):
+        storage.insert(key, value)
+        storage.unlink()
 
-        assert storage.latest(data.primary_key) == data
-
-        for tkey, tvalue in data.tags.items():
-            assert data.primary_key in storage.search(tkey, tvalue)
+        assert len(storage) == 0
+        assert storage.capacity == 0
+        assert storage.query(key) is None
