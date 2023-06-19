@@ -9,8 +9,8 @@ from behave import given
 from behave import then
 from behave import when
 from faker import Faker
-from papyrus.types import Data
 from papyrus.types import Key
+from papyrus.types import Value
 
 logger = logging.getLogger("bdd")
 
@@ -37,7 +37,7 @@ class PapyrusInstance:
         self.proc.stdin.write(f"{cmd}\n".encode())
         self.proc.stdin.flush()
 
-    def recv(self, timeout=0.7) -> str:
+    def recv(self, timeout=0.2) -> str:
         lines = []
         start = time.monotonic_ns()
 
@@ -68,22 +68,11 @@ def step_load_papyrus_settings(context):
 
 @given("generate the random data as {name}")
 @given("generate the random data as {name} with {amount} amount")
-@given("generate the random data as {name} with {amount} amount and tag {tname}={tvalue}")
-def step_generate_random_data(
-    context,
-    name,
-    amount: str | None = None,
-    tname: str | None = None,
-    tvalue: str | None = None,
-):
+def step_generate_random_data(context, name, amount: str | None = None):
     fake = Faker()
     amount = int(amount or 1)
 
-    tags = {}
-    if tname and tvalue:
-        tags[tname] = Key(tvalue)
-
-    setattr(context, name, [Data(fake.pyint(), fake.pystr(), tags=tags) for _ in range(amount)])
+    setattr(context, name, [(Key(fake.pyint()), Value(fake.pystr())) for _ in range(amount)])
 
 
 @when("load the papyrus instance")
@@ -93,15 +82,14 @@ def step_load_papyrus_instance(context):
 
 @when("insert data {name} to the papyrus instance")
 def step_insert_data(context, name):
-    for data in getattr(context, name):
-        tags = " ".join([f"{k}={v}" for k, v in data.tags.items()])
-        context.proc.send(f"insert {data.primary_key} {data.value} {tags}")
+    for key, value in getattr(context, name):
+        context.proc.send(f"insert {key} {value}")
 
 
 @when("delete key from data {name} on the papyrus instance")
 def step_delete_key_from_data(context, name):
-    for data in getattr(context, name):
-        context.proc.send(f"delete {data.primary_key}")
+    for key, _ in getattr(context, name):
+        context.proc.send(f"delete {key}")
 
 
 @then("the papyrus instance should be loaded")
@@ -119,32 +107,8 @@ def test_check_data_exists(context, name, should_be):
     assert should_be in ("should be", "should not be"), should_be
     should_be = should_be == "should be"
 
-    for data in getattr(context, name):
-        context.proc.send(f"latest {data.primary_key}")
+    for key, value in getattr(context, name):
+        context.proc.send(f"query {key}")
         resp = context.proc.recv()
 
-        assert data.value == resp if should_be else data.value != resp
-
-
-@then("the data {name} {should_be} within the revision in the papyrus instance")
-def test_check_data_within_revision(context, name, should_be):
-    assert should_be in ("should be", "should not be"), should_be
-    should_be = should_be == "should be"
-
-    for data in getattr(context, name):
-        context.proc.send(f"revision {data.primary_key}")
-        resp = context.proc.recv()
-
-        assert f"[+] {data.value}" in resp.split("\n") if should_be else f"[+] {data.value}" not in resp.split("\n")
-
-
-@then("search tag {tname}={tvalue} and the data {name} primary key {should_be} belongs to the result")
-def test_check_primary_key_belongs_to_search_result(context, name, tname, tvalue, should_be):
-    assert should_be in ("should be", "should not be"), should_be
-    should_be = should_be == "should be"
-
-    for data in getattr(context, name):
-        context.proc.send(f"search {tname}={tvalue}")
-        resp = context.proc.recv()
-
-        assert str(data.primary_key) in resp.split("\n") if should_be else str(data.primary_key) not in resp.split("\n")
+        assert value == resp if should_be else value != resp

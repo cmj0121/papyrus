@@ -4,6 +4,9 @@ import abc
 
 
 class Serializable(abc.ABC):
+    def __bytes__(self) -> bytes:
+        return self.to_bytes()
+
     @abc.abstractmethod
     def to_bytes(self) -> bytes:
         raise NotImplementedError(f"{self.__class__.__name__} must implement to_bytes()")

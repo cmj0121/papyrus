@@ -27,7 +27,8 @@ class Settings(YamlModel):
     debug: bool = Field(default=False, description="used to enable or disable the debug mode")
     log_level: LogLevel = Field(default=LogLevel.ERROR, description="the log level of Papyrus")
 
-    layers: list[LayerSettings] = Field(..., description="the layers of Papyrus")
+    layers: list[LayerSettings] = Field(default=[], description="the layers of Papyrus")
+    default_layer: LayerSettings | None = Field(default=None, description="the default layer of Papyrus")
 
     class Config:
         env_file = ".env.yml .env.yaml"

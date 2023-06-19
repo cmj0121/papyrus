@@ -1,10 +1,12 @@
 from ._base import BaseLayer as Layer
-from ._base import Data
+from ._base import DuplicateKey
+from ._base import ThresholdLimit
 from .mem import MemLayer
 
 
 __all__ = [
-    "Data",
     "Layer",
+    "ThresholdLimit",
+    "DuplicateKey",
     "MemLayer",
 ]
