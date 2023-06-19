@@ -83,6 +83,16 @@ class Value(Serializable, Deserializable):
             case _:
                 return self.raw == other
 
+    def delete(self):
+        """mark the value as deleted."""
+        self._raw = None
+        self._vtype = ValueType.DEL
+
+    @property
+    def is_deleted(self) -> bool:
+        """check if the value is deleted."""
+        return self.vtype == ValueType.DEL
+
     @property
     def vtype(self) -> ValueType:
         """the category of the value."""

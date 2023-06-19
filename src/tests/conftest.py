@@ -33,3 +33,8 @@ def value(faker):
             yield Value(faker.binary())
         case ValueType.CMP:
             yield Value(faker.binary(), vtype)
+
+
+# ======== aliases ========
+key2 = key
+value2 = value

@@ -1,10 +1,7 @@
-import string
-
 import pytest
-from papyrus.layers import Data
+from papyrus.layers import DuplicateKey
 from papyrus.layers import Layer
-from papyrus.types import Key
-from papyrus.types import UniqueID
+from papyrus.layers import ThresholdLimit
 
 
 class TestLayerRegister:
@@ -30,14 +27,6 @@ class TestLayerRegister:
     ],
 )
 class TestLayerBasic:
-    TEST_KEYS = [
-        (True, False),
-        range(10),
-        range(1024),
-        string.ascii_letters,
-        (*range(16), *string.ascii_letters),
-    ]
-
     @pytest.fixture
     def layer(self, uri):
         layer = Layer.open(uri, cached=False)
@@ -45,86 +34,79 @@ class TestLayerBasic:
 
     def test_empty_layer(self, uri, layer):
         assert len(layer) == 0
-        assert layer.cap == 0
+        assert layer.capacity == 0
 
-    @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_insert_value(self, layer, raws):
-        datas = [Data(Key(key)) for key in raws]
+    def test_layer_insert(self, layer, key, value):
+        layer.insert(key, value)
 
-        for index, data in enumerate(datas):
-            assert data.primary_key not in layer
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-            uid = layer.insert(data)
+    def test_layer_insert_exists(self, layer, key, value, value2):
+        layer.insert(key, value)
 
-            assert isinstance(uid, UniqueID)
-            assert data.primary_key in layer
-            assert uid in layer
-            assert len(layer) == index + 1
-            assert layer.cap == index + 1
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-    @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_delete_value(self, layer, raws):
-        datas = [Data(Key(key)) for key in raws]
+        with pytest.raises(DuplicateKey):
+            layer.insert(key, value2)
 
-        [layer.insert(data) for data in datas]
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-        assert len(layer) == len(raws)
-        assert layer.cap == len(raws)
+    def test_layer_insert_force(self, layer, key, value, value2):
+        layer.insert(key, value)
 
-        for index, data in enumerate(datas):
-            assert data.primary_key in layer
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-            layer.delete(data.primary_key)
+        layer.insert(key, value2, force=True)
 
-            assert data.primary_key not in layer
-            assert len(layer) == len(raws) - index - 1
-            assert layer.cap == len(raws) + index + 1
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-    @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_latest_value(self, layer, raws):
-        datas = [Data(Key(key)) for key in raws]
+    def test_layer_delete(self, layer, key, value):
+        layer.insert(key, value)
+        layer.delete(key)
 
-        for data in datas:
-            assert layer.latest(data.primary_key) is None
+        assert len(layer) == 0
+        assert layer.capacity == 1
 
-            layer.insert(data)
-            assert layer.latest(data.primary_key) is data
+    def test_layer_query(self, layer, key, value):
+        layer.insert(key, value)
+        assert layer.query(key) == value
 
-            layer.delete(data.primary_key)
-            assert layer.latest(data.primary_key) is None
+        layer.delete(key)
+        assert layer.query(key).is_deleted
 
-    @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_revision(self, layer, raws):
-        datas = [Data(Key(key)) for key in raws]
+    def test_layer_iterate(self, layer, key, value):
+        layer.insert(key, value)
+        rows = list(layer.iterate())
 
-        for data in datas:
-            assert layer.revision(data.primary_key) == []
+        assert rows == [(key, value)]
 
-            layer.insert(data)
-            assert layer.revision(data.primary_key) == [data]
+    def test_layer_purge(self, layer, key, value):
+        layer.insert(key, value)
 
-            layer.delete(data.primary_key)
-            assert len(layer.revision(data.primary_key)) == 2
-            assert layer.revision(data.primary_key)[0].is_deleted is True
-            assert layer.revision(data.primary_key)[1] is data
+        layer.purge()
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-    @pytest.mark.parametrize("raws", TEST_KEYS)
-    def test_purge(self, layer, raws):
-        datas = [Data(Key(key)) for key in raws]
+        layer.delete(key)
+        layer.purge()
+        assert len(layer) == 0
+        assert layer.capacity == 0
 
-        for data in datas:
-            layer.insert(data)
-            layer.delete(data.primary_key)
+        layer.purge()
 
-            assert data.primary_key not in layer
-            assert len(layer) == 0
-            assert layer.cap == 2
+    def test_layer_unlink(self, layer, key, value):
+        layer.insert(key, value)
 
-            layer.purge()
+        layer.unlink()
+        assert len(layer) == 0
+        assert layer.capacity == 0
 
-            assert data.primary_key not in layer
-            assert len(layer) == 0
-            assert layer.cap == 0
+        layer.unlink()
 
 
 @pytest.mark.parametrize(
@@ -132,31 +114,34 @@ class TestLayerBasic:
         "mem://",
     ],
 )
-class TestLayerSearch:
+class TestLayerThreshold:
     @pytest.fixture
     def layer(self, uri):
-        layer = Layer.open(uri, cached=False)
+        layer = Layer.open(uri, threshold=1, cached=False)
         yield layer
 
-    def test_search_nil_set(self, layer, data):
-        for tname, tvalue in data.tags.items():
-            assert data.primary_key not in layer.search(tname, tvalue)
+    def test_empty_layer(self, uri, layer):
+        assert len(layer) == 0
+        assert layer.capacity == 0
 
-    def test_search_key(self, layer, data):
-        layer.insert(data)
+    def test_layer_insert(self, layer, key, value):
+        layer.insert(key, value)
 
-        for tname, tvalue in data.tags.items():
-            assert data.primary_key in layer.search(tname, tvalue)
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-    def test_search_key_deleted(self, layer, data):
-        layer.insert(data)
-        layer.delete(data.primary_key)
+    def test_layer_insert_hit_threshold(self, layer, key, key2, value):
+        layer.insert(key, value)
 
-        for tname, tvalue in data.tags.items():
-            assert data.primary_key not in layer.search(tname, tvalue)
+        assert len(layer) == 1
+        assert layer.capacity == 1
 
-    def test_search_key_delete_non_exists_key(self, layer, data):
-        layer.delete(data.primary_key)
+        with pytest.raises(ThresholdLimit):
+            layer.insert(key2, value)
 
-        for tname, tvalue in data.tags.items():
-            assert data.primary_key not in layer.search(tname, tvalue)
+    def test_layer_delete(self, layer, key, value):
+        layer.insert(key, value)
+        layer.delete(key)
+
+        assert len(layer) == 0
+        assert layer.capacity == 1
