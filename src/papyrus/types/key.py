@@ -86,8 +86,13 @@ class Key(Serializable, Deserializable):
     and convert from the binary format to the key.
     """
     def __init__(self, raw: Any, ktype: KeyType | None = None):
-        self._ktype = KeyType.detect(raw) if ktype is None else ktype
-        self._value = self._ktype.cast(raw)
+        match isinstance(raw, Key):
+            case True:
+                self._ktype = raw.ktype
+                self._value = raw.value
+            case False:
+                self._ktype = KeyType.detect(raw) if ktype is None else ktype
+                self._value = self._ktype.cast(raw)
 
     def __repr__(self):
         """show the human-readable representation of the key."""

@@ -93,3 +93,4 @@ class TestKey:
 
     def test_random_key(self, key):
         assert key == Key.from_bytes(key.to_bytes())
+        assert key == Key(key)

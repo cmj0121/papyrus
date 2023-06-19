@@ -79,15 +79,16 @@ class Storage:
         """
         return sum(layer.capacity for layer in self.layers)
 
-    def insert(self, key: Key, value: Value, /, force: bool = False) -> Value | None:
+    def insert(self, key: Any, value: Any, /, force: bool = False) -> Value | None:
         """call the insert method of the layer."""
-        return self.layer.insert(key, value, force=force)
+        return self.layer.insert(Key(key), Value(value), force=force)
 
-    def delete(self, key: Key) -> bool:
+    def delete(self, key: Any) -> bool:
         """call the delete method of the layer."""
-        return self.layer.delete(key)
+        return self.layer.delete(Key(key))
 
-    def query(self, key: Key) -> Value | None:
+    def query(self, key: Any) -> Value | None:
+        key = Key(key)
         for layer in self.layers:
             value = layer.query(key)
             if value is not None:

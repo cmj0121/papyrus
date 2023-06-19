@@ -53,3 +53,4 @@ class TestValue:
 
     def test_random_value(self, value):
         assert value == Value.from_bytes(value.to_bytes())
+        assert value == Value(value)

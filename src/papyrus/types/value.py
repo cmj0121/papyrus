@@ -55,11 +55,16 @@ class Value(Serializable, Deserializable):
     """
 
     def __init__(self, raw: bytes | None, vtype: ValueType | None = None):
-        self._raw = raw
-        self._vtype = (ValueType.NIL if raw is None else ValueType.RAW) if vtype is None else vtype
+        match isinstance(raw, Value):
+            case True:
+                self._raw = raw.raw
+                self._vtype = raw.vtype
+            case False:
+                self._raw = raw
+                self._vtype = (ValueType.NIL if raw is None else ValueType.RAW) if vtype is None else vtype
 
-        if self.raw and len(self.raw) > 0x1000000:
-            self._vtype = ValueType.CMP
+                if self.raw and len(self.raw) > 0x1000000:
+                    self._vtype = ValueType.CMP
 
     def __repr__(self):
         return f"<Value: {self.vtype}> {self.raw}"

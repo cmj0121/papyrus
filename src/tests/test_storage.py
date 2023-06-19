@@ -5,6 +5,7 @@ import pytest
 from papyrus.layers import DuplicateKey
 from papyrus.settings import Settings
 from papyrus.storage import Storage
+from papyrus.types import Value
 
 
 @cache
@@ -26,6 +27,10 @@ class TestStorage:
     def storage(self, config) -> Storage:
         """the storage instance"""
         return Storage(config.layers, default_layer=config.default_layer, cached=False)
+
+    @pytest.fixture
+    def size(self) -> int:
+        return 64
 
     def test_empty_storage(self, storage):
         assert len(storage) == 0
@@ -82,3 +87,26 @@ class TestStorage:
         assert len(storage) == 0
         assert storage.capacity == 0
         assert storage.query(key) is None
+
+    def test_storage_iter(self, storage, faker, size):
+        data = [(n, Value(faker.binary(length=64))) for n in range(size)]
+
+        for index, (key, value) in enumerate(data):
+            storage.insert(key, value)
+
+        assert len(storage) == size
+        assert storage.capacity == size
+
+        assert len(list(storage.iterate())) == size
+        assert len(list(storage.iterate(desc=False))) == size
+
+    def test_storage_iter_with_based(self, storage, faker, size):
+        data = [(n, Value(faker.binary(length=64))) for n in range(size)]
+
+        for index, (key, value) in enumerate(data):
+            storage.insert(key, value)
+
+        index = size // 3
+        based = data[index][0]
+        assert len(list(storage.iterate(based=based))) == index + 1
+        assert len(list(storage.iterate(based=based, desc=False))) == size - index
