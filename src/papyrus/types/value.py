@@ -55,6 +55,14 @@ class Value(Serializable, Deserializable):
     """
 
     def __init__(self, raw: bytes | None, vtype: ValueType | None = None):
+        match raw:
+            case bytes():
+                ...
+            case str():
+                raw = raw.encode("utf-8")
+            case _:
+                raise TypeError(f"unsupported type: {type(raw)=}")
+
         match isinstance(raw, Value):
             case True:
                 self._raw = raw.raw
