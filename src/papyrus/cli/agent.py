@@ -29,6 +29,7 @@ class Action(enum.Enum):
     INSERT = "insert"
     DELETE = "delete"
     QUERY = "query"
+    ITER = "iter"
 
     @classmethod
     def to_list(cls) -> list[str]:
@@ -194,7 +195,11 @@ class Agent:
                         for key in args:
                             value = self.storage.query(key)
                             if value is not None:
-                                print(value)
+                                print(value.raw.decode())
+                    case Action.ITER:
+                        for key, value in self.storage.iterate():
+                            print(f"{key} = {value.raw.decode()}")
+
                     case _:
                         command = Command.get_command(cmd)
                         if command is None:
@@ -212,7 +217,6 @@ class Agent:
             except DuplicateKey:
                 logger.error(f"duplicate key: {key}")
             except Exception as err:
-                logger.critical(f"unhandled exception: {err}")
-                return 1
+                logger.critical(f"unhandled exception: {err}", exc_info=True)
 
         return 0

@@ -29,7 +29,8 @@ class KeyType(enum.Enum):
             case _:
                 raise NotImplementedError(f"unknown key type: {other}")
 
-    def cap(self):
+    @property
+    def capacity(self):
         match self:
             case KeyType.BOOL:
                 return 1
@@ -157,12 +158,12 @@ class Key(Serializable, Deserializable):
     def to_bytes(self) -> bytes:
         match self.ktype:
             case KeyType.BOOL:
-                return int(self.value).to_bytes(self.ktype.cap(), byteorder="big", signed=True)
+                return int(self.value).to_bytes(self.ktype.capacity, byteorder="big", signed=True)
             case KeyType.WORD | KeyType.INT | KeyType.UID:
-                return self.value.to_bytes(self.ktype.cap(), byteorder="big", signed=True)
+                return self.value.to_bytes(self.ktype.capacity, byteorder="big", signed=True)
             case KeyType.STR | KeyType.TEXT:
                 data = self.value.encode("utf-8")
-                data = data + b"\x00" * (self.ktype.cap() - len(data))
+                data = data + b"\x00" * (self.ktype.capacity - len(data))
                 return data
             case _:
                 raise NotImplementedError(f"unknown key type: {self.ktype}")
