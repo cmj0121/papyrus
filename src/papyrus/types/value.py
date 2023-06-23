@@ -55,6 +55,14 @@ class Value(Serializable, Deserializable):
     """
 
     def __init__(self, raw: bytes | None, vtype: ValueType | None = None):
+        match raw:
+            case bytes():
+                ...
+            case str():
+                raw = raw.encode("utf-8")
+            case _:
+                raise TypeError(f"unsupported type: {type(raw)=}")
+
         match isinstance(raw, Value):
             case True:
                 self._raw = raw.raw
@@ -159,7 +167,7 @@ class Value(Serializable, Deserializable):
         checksum = data[4 + size + padding:]
 
         if checksum != struct.pack(">I", self.checksum(data[:4 + size + padding])):
-            raise ValueError("invalid value checksum: {checksum=} != {self.checksum(data[:4 + size + padding])=}")
+            raise ValueError(f"invalid value checksum: {checksum=} != {self.checksum(data[:4 + size + padding])=}")
 
         match vtype:
             case ValueType.NIL:

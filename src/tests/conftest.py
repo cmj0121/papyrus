@@ -27,9 +27,7 @@ def value(faker):
     match vtype:
         case ValueType.NIL:
             yield Value(None)
-        case ValueType.DEL:
-            yield Value(None, vtype)
-        case ValueType.RAW:
+        case ValueType.DEL | ValueType.RAW:
             yield Value(faker.binary())
         case ValueType.CMP:
             yield Value(faker.binary(), vtype)
