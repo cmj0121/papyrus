@@ -1,47 +1,23 @@
-include Makefile.in
+.PHONY: all clean test run build upgrade help
 
-SUBDIR :=
-
-.PHONY: all clean test stress bdd run build install upgrade help $(SUBDIR)
-
-all: $(SUBDIR) 		# default action
-	@[ -f .git/hooks/pre-commit ] || pre-commit install --install-hooks
+all: 			# default action
+	@pre-commit install --install-hooks
 	@git config commit.template .git-commit-template
 
-clean: $(SUBDIR)	# clean-up environment
-	@find . -name '*.sw[po]' -o -name '*.py[co]' -delete
-	@find . -name '__pycache__' -delete
-	@rm -rf dist/
+clean:			# clean-up environment
+	@find . -name '*.sw[po]' -delete
 
-test: $(VENV)		# run test
-	$(POETRY) run pytest -n auto --cov=src/papyrus --no-cov-on-fail --benchmark-skip
+test:			# run test
 
-stress: $(VENV)		# run stress test
-	$(POETRY) run pytest --benchmark-only --benchmark-name=short --benchmark-columns=min,mean,max,ops,outliers
+run:			# run in the local environment
 
-bdd: $(VENV)		# run the BDD test
-	$(POETRY) run behave --logcapture src/features
+build:			# build the binary/library
 
-run:				# run in the local environment
-	$(POETRY) run papyrus
-
-build: $(VENV)		# build the binary/library
-	$(POETRY) build
-
-install: $(VENV)		# install the binary tool into local env
-	$(POETRY) install
-
-upgrade:			# upgrade all the necessary packages
+upgrade:		# upgrade all the necessary packages
 	pre-commit autoupdate
 
-help:				# show this message
+help:			# show this message
 	@printf "Usage: make [OPTION]\n"
 	@printf "\n"
 	@perl -nle 'print $$& if m{^[\w-]+:.*?#.*$$}' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
-
-$(SUBDIR):
-	$(MAKE) -C $@ $(MAKECMDGOALS)
-
-$(VENV):
-	$(PYTHON) -m venv $@
