@@ -1,4 +1,0 @@
-PYTHON := python3.11
-POETRY := poetry
-
-VENV := .venv

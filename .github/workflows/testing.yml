@@ -31,16 +31,10 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 1
-      - uses: actions/setup-python@v4
+      - uses: actions-rs/toolchain@v1
         with:
-          python-version: "3.11"
-      - name: install packages
-        run: |
-          pip install poetry
-          poetry config virtualenvs.create false --local
-          poetry install
-      - name: run testing
-        run: |
-          poetry run pytest -n auto --cov=src/papyrus --no-cov-on-fail --benchmark-skip
-          poetry run pytest --benchmark-only --benchmark-name=short --benchmark-columns=min,mean,max,ops,outliers
-          poetry run behave --logcapture src/features
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --all-features

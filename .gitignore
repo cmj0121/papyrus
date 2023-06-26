@@ -1,10 +1,7 @@
 *.sw[po]
 
-*.py[oc]
-__pycache__/
-dist/
-
 .env.yml
 .env.yaml
-.venv/
-.coverage
+
+# Added by cargo
+/target

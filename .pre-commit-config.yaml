@@ -21,24 +21,9 @@ repos:
     hooks:
       - id: reformat-gherkin
 
-  # -------- python related linter --------
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.272
+  # -------- rust related linter --------
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
     hooks:
-      - id: ruff
-        args:
-          - --fix
-  - repo: https://github.com/asottile/reorder_python_imports
-    rev: v3.9.0
-    hooks:
-      - id: reorder-python-imports
-        args: [--py3-plus]
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v2.5.1
-    hooks:
-      - id: add-trailing-comma
-        args: [--py36-plus]
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.6.0
-    hooks:
-      - id: pyupgrade
+      - id: fmt
+      - id: cargo-check

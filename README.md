@@ -1,6 +1,6 @@
 # Papyrus
 
-> embeddable, persistent, and revisions
+> embeddable, persistent, and revision
 
 [![Testing][0]][1]
 
