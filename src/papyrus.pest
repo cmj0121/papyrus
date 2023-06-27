@@ -1,0 +1,15 @@
+expression = { space* ~ command ~ space* ~ EOI }
+command    = { put_command | get_command | del_command }
+
+put_command = { put ~ key ~ space ~ value }
+get_command = { get ~ keys }
+del_command = { del ~ keys }
+
+put = { ( ( ^"put" ~ space ) | "+" ~ ( space )? ) }
+get = { ( ( ^"get" ~ space ) | "?" ~ ( space )? ) }
+del = { ( ( ^"del" ~ space ) | "-" ~ ( space )? ) }
+
+space = { SPACE_SEPARATOR+ }
+keys  = { key ~ ( space ~ key)* }
+key   = @{ ( !space ~ ANY )+ }
+value = { ANY+ }

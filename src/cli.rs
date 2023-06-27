@@ -1,10 +1,37 @@
 //! The command-line tool for Papyrus.
-use clap::Parser;
+use clap::Parser as ClapParser;
+use pest::{iterators::Pair, Parser};
+use pest_derive::Parser as PestParser;
 use rustyline::{error::ReadlineError, DefaultEditor};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
+
+/// The PEG based parser for Parser CLI.
+///
+/// # Grammar
+///
+/// ```peg
+/// expression = { space* ~ command ~ space* ~ EOI }
+/// command    = { put_command | get_command | del_command }
+///
+/// put_command = { put ~ key ~ space ~ value }
+/// get_command = { get ~ keys }
+/// del_command = { del ~ keys }
+///
+/// put = { ( ( ^"put" ~ space ) | "+" ~ ( space )? ) }
+/// get = { ( ( ^"get" ~ space ) | "?" ~ ( space )? ) }
+/// del = { ( ( ^"del" ~ space ) | "-" ~ ( space )? ) }
+///
+/// space = { SPACE_SEPARATOR+ }
+/// keys  = { key ~ ( space ~ key)* }
+/// key   = @{ ( !space ~ ANY )+ }
+/// value = { ANY+ }
+/// ```
+#[derive(PestParser)]
+#[grammar = "papyrus.pest"]
+pub struct PapyrusParser;
 
 /// The command-line tool for Papyrus.
-#[derive(Debug, Parser)]
+#[derive(Debug, ClapParser)]
 #[command(author, version, about, long_about = None)]
 pub struct Papyrus {
     #[clap(flatten)]
@@ -40,7 +67,7 @@ impl Papyrus {
             let readline = rl.readline("papyrus> ");
 
             match readline {
-                Ok(line) => self.eval(&line),
+                Ok(line) => self.parse_and_eval(&line),
                 Err(ReadlineError::Interrupted) => break,
                 Err(ReadlineError::Eof) => break,
                 Err(err) => {
@@ -55,9 +82,70 @@ impl Papyrus {
         code
     }
 
-    /// read the input from the user and evaluate it
-    fn eval(&self, expr: &str) {
+    /// read the input from the user, parse the syntax and evaluate the expression
+    fn parse_and_eval(&self, expr: &str) {
         debug!("try to evaluate: {}", expr);
+
+        match PapyrusParser::parse(Rule::expression, expr) {
+            Err(err) => {
+                warn!("invalid syntax: {}", err);
+                println!("invalid syntax: {}", expr);
+            }
+            Ok(pairs) => {
+                let expression = pairs
+                    .filter(|p| p.as_rule() == Rule::expression)
+                    .next()
+                    .expect("expression pair not found");
+                let command = expression
+                    .into_inner()
+                    .next()
+                    .expect("command pair not found");
+
+                self.evaluate(command);
+            }
+        }
+    }
+
+    /// evaluate the parsed pair
+    fn evaluate(&self, pair: Pair<Rule>) {
+        trace!("evaluate pair: {:?}", pair);
+
+        match pair.as_rule() {
+            Rule::command => {
+                let command = pair.into_inner().next().expect("command pair not found");
+                self.evaluate(command);
+            }
+            Rule::get_command | Rule::del_command => {
+                let operator = pair.as_rule();
+                let keys: Vec<String> = pair
+                    // seach the keys pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::keys)
+                    .next()
+                    .expect("keys pair not found")
+                    // list all the key pairs
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::key)
+                    // convert the key pair to key string
+                    .map(|p| p.as_str().to_string())
+                    .collect();
+
+                println!("{:?} {:?}", operator, keys);
+            }
+            Rule::put_command => {
+                let key_value: Vec<String> = pair
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::key || p.as_rule() == Rule::value)
+                    .map(|p| p.as_str().to_string())
+                    .collect();
+
+                println!("put_command: {:?}", key_value);
+            }
+            _ => {
+                warn!("invalid command: {:?}", pair);
+                println!("invalid command: {:?}", pair.as_rule());
+            }
+        }
     }
 
     /// setup everything before running
