@@ -1,6 +1,7 @@
 //! The command-line tool for Papyrus.
 use clap::Parser;
-use tracing::trace;
+use rustyline::{error::ReadlineError, DefaultEditor};
+use tracing::{debug, error, trace};
 
 /// The command-line tool for Papyrus.
 #[derive(Debug, Parser)]
@@ -24,9 +25,39 @@ impl Papyrus {
         self.setup_logging();
 
         self.prologue();
+        let code = self.eval_loop();
         self.epologue();
 
-        0
+        code
+    }
+
+    /// the read-eval-print-loop
+    fn eval_loop(&self) -> i32 {
+        let mut code = 0;
+        let mut rl = DefaultEditor::new().unwrap();
+
+        loop {
+            let readline = rl.readline("papyrus> ");
+
+            match readline {
+                Ok(line) => self.eval(&line),
+                Err(ReadlineError::Interrupted) => break,
+                Err(ReadlineError::Eof) => break,
+                Err(err) => {
+                    error!("readline error: {:?}", err);
+
+                    code = 1;
+                    break;
+                }
+            }
+        }
+
+        code
+    }
+
+    /// read the input from the user and evaluate it
+    fn eval(&self, expr: &str) {
+        debug!("try to evaluate: {}", expr);
     }
 
     /// setup everything before running
