@@ -16,8 +16,8 @@ pub struct Papyrus {
 impl Papyrus {
     /// Run the papyrus in REPL mode.
     pub fn run_and_exit(&self) {
-        self.setup_logging();
-        std::process::exit(self.run());
+        let code = self.run();
+        std::process::exit(code);
     }
 
     fn run(&self) -> i32 {
