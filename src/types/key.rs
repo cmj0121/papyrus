@@ -82,3 +82,33 @@ impl From<&str> for Key {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use paste::paste;
+
+    macro_rules! test_key_convert {
+        ($type:ident, $value:expr) => {
+            paste! {
+                #[test]
+                fn [<test_key_convert_ $type:lower _ $value>]() {
+                    let key: Key = $value.into();
+                    assert_eq!(key, Key::$type($value.into()));
+                }
+            }
+        };
+    }
+
+    test_key_convert!(BOOL, true);
+    test_key_convert!(BOOL, false);
+    test_key_convert!(INT, 0);
+    test_key_convert!(INT, 1);
+    test_key_convert!(INT, 65535);
+    test_key_convert!(INT, 4294967295i64);
+    test_key_convert!(UID, 18446744073709551616u128);
+    test_key_convert!(UID, 36893488147419103231u128);
+    test_key_convert!(UID, 340282366920938463463374607431768211455u128);
+    test_key_convert!(STR, "");
+    test_key_convert!(STR, "a");
+}
