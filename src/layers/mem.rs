@@ -1,10 +1,12 @@
 //! The in-memory Layer implementation.
 use crate::{Key, Layer, Value};
 use std::collections::{HashMap, HashSet};
+use url::Url;
 
 /// The in-memory Layer implementation.
 ///
 /// It is based on data structure to hold the key-value pairs in memory.
+#[derive(Debug, Default)]
 pub struct MemLayer {
     /// use the simplest hashmap to hold the key-value pairs, it is not the best
     /// method but easy to implement.
@@ -15,6 +17,10 @@ pub struct MemLayer {
 }
 
 impl Layer for MemLayer {
+    fn open(_: Url) -> Self {
+        MemLayer::default()
+    }
+
     // ======== the general methods ========
     /// Get the value of the specified key, return None if the key does not exist.
     /// Note that the value may return if marked as deleted.

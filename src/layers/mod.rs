@@ -6,5 +6,5 @@
 mod mem;
 mod traits;
 
-pub use mem::MemLayer;
-pub use traits::Layer;
+pub(crate) use mem::MemLayer;
+pub use traits::{get_layer, Layer};

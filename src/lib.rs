@@ -7,5 +7,5 @@
 mod layers;
 mod types;
 
-pub use layers::Layer;
+pub use layers::{get_layer, Layer};
 pub use types::{Key, Value};

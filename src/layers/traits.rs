@@ -1,5 +1,8 @@
 //! The abstraction of the Layer.
+use crate::layers::MemLayer;
 use crate::{Key, Value};
+use tracing::{trace, warn};
+use url::Url;
 
 /// The abstraction of the Layer.
 ///
@@ -7,6 +10,11 @@ use crate::{Key, Value};
 /// and extra but danger methods for specific usages. It is designed to be
 /// simple to use and easy to implement.
 pub trait Layer {
+    /// Open Layer by the passed URL.
+    fn open(url: Url) -> Self
+    where
+        Self: Sized;
+
     // ======== the general methods ========
     /// Get the value of the specified key, return None if the key does not exist.
     /// Note that the value may return if marked as deleted.
@@ -28,4 +36,23 @@ pub trait Layer {
     /// Remove all the data marked as deleted, reorganize the data and file, and make
     /// the layer compact.
     fn compact(&mut self);
+}
+
+/// Get the Layer via passed URL.
+pub fn get_layer(url: &str) -> Option<Box<dyn Layer>> {
+    trace!("try to get layer from {}", url);
+
+    match Url::parse(url) {
+        Ok(url) => match url.scheme() {
+            "mem" => Some(Box::new(MemLayer::open(url))),
+            _ => {
+                warn!("cannot find scheme {} for layer", url.scheme());
+                None
+            }
+        },
+        Err(err) => {
+            trace!("failed to parse url {}: {}", url, err);
+            None
+        }
+    }
 }
