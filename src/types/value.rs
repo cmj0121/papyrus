@@ -7,7 +7,7 @@ use tracing::trace;
 /// It is the arbitrary length data upload from user and stored in the
 /// Papyrus. It can be any binary data and may compressed or store as
 /// another detached file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     /// The empty value.
     EMPTY,
@@ -39,5 +39,18 @@ impl From<&str> for Value {
 
         let data = data.as_bytes();
         data.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deleted_value() {
+        let mut value: Value = Value::EMPTY;
+        value.delete();
+
+        assert_eq!(value, Value::DELETED);
     }
 }
