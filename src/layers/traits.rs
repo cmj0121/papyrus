@@ -56,3 +56,84 @@ pub fn get_layer(url: &str) -> Option<Box<dyn Layer>> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use paste::paste;
+
+    macro_rules! test_layer {
+        ($scheme:ident, $url:expr) => {
+            paste! {
+                #[test]
+                fn [<test_get_layer_from_ $scheme>]() {
+                    let layer = get_layer($url);
+
+                    assert_eq!(layer.is_some(), true);
+                }
+
+                #[test]
+                fn [<test_layer_get_empty_on_ $scheme>]() {
+                    let key: Key = "key".into();
+                    let layer = get_layer($url).unwrap();
+
+                    assert_eq!(layer.get(&key), None);
+                }
+
+                #[test]
+                fn [<test_layer_put_and_get_on_ $scheme>]() {
+                    let key: Key = "key".into();
+                    let value: Value = "value".into();
+                    let mut layer = get_layer($url).unwrap();
+
+                    layer.put(&key, value.clone());
+
+                    assert_eq!(layer.get(&key), Some(value));
+                }
+
+                #[test]
+                fn [<test_layer_put_and_del_on_ $scheme>]() {
+                    let key: Key = "key".into();
+                    let value: Value = "value".into();
+                    let mut layer = get_layer($url).unwrap();
+
+                    layer.put(&key, value.clone());
+                    layer.del(&key);
+
+                    assert_eq!(layer.get(&key), Some(Value::DELETED));
+                }
+
+                #[test]
+                fn [<test_layer_compact_on_ $scheme>]() {
+                    let key: Key = "key".into();
+                    let value: Value = "value".into();
+                    let mut layer = get_layer($url).unwrap();
+
+                    layer.put(&key, value.clone());
+                    layer.compact();
+                    assert_eq!(layer.get(&key), Some(value));
+
+                    layer.del(&key);
+                    layer.compact();
+
+                    assert_eq!(layer.get(&key), None);
+                }
+
+                #[test]
+                fn [<test_layer_unlink_on_ $scheme>]() {
+                    let key: Key = "key".into();
+                    let value: Value = "value".into();
+                    let mut layer = get_layer($url).unwrap();
+
+                    layer.put(&key, value.clone());
+                    layer.unlink();
+
+                    assert_eq!(layer.get(&key), None);
+                }
+
+            }
+        };
+    }
+
+    test_layer!(mem, "mem://");
+}
