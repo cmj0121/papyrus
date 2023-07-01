@@ -4,6 +4,8 @@
 //! nothing more. It is designed to be embedded in other applications and
 //! programming languages.
 
+mod layers;
 mod types;
 
+pub use layers::Layer;
 pub use types::{Key, Value};
