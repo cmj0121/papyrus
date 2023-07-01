@@ -1,4 +1,6 @@
 //! Value is the arbitrary length data used in Papyrus.
+use std::convert::From;
+use tracing::trace;
 
 /// Value is the arbitrary length data used in Papyrus.
 ///
@@ -6,4 +8,36 @@
 /// Papyrus. It can be any binary data and may compressed or store as
 /// another detached file.
 #[derive(Debug, Clone)]
-pub enum Value {}
+pub enum Value {
+    /// The empty value.
+    EMPTY,
+
+    /// The marked as deleted value.
+    DELETED,
+
+    /// The raw binary data.
+    RAW(Vec<u8>),
+}
+
+impl Value {
+    /// make the current value as deleted.
+    pub fn delete(&mut self) {
+        *self = Value::DELETED
+    }
+}
+
+// ======== value-to-value conversions ========
+impl From<&[u8]> for Value {
+    fn from(data: &[u8]) -> Self {
+        Value::RAW(data.to_vec())
+    }
+}
+
+impl From<&str> for Value {
+    fn from(data: &str) -> Self {
+        trace!("converting {} to value", data);
+
+        let data = data.as_bytes();
+        data.into()
+    }
+}
