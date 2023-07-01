@@ -6,7 +6,7 @@ use tracing::error;
 ///
 /// It is the fixed length and well-known type that is used as the primary
 /// key or index for the key-value pairs in Papyrus.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Hash)]
 pub enum Key {
     /// The truth value
     BOOL(bool),
