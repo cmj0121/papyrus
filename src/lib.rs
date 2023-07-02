@@ -4,8 +4,10 @@
 //! nothing more. It is designed to be embedded in other applications and
 //! programming languages.
 
+mod errors;
 mod layers;
 mod types;
 
+pub use errors::{Error, Result};
 pub use layers::{get_layer, Layer};
 pub use types::{Key, Value};
