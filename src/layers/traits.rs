@@ -28,6 +28,10 @@ pub trait Layer {
     /// but mark it as deleted.
     fn del(&mut self, key: &Key);
 
+    // ======== the iteration methods ========
+    /// Iterate over the key-value pairs in the layer which the order is not guaranteed.
+    fn iter(&self) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
+
     // ======== the authenticated methods ========
     /// Remove the existing data and files. The layer may not be initialized until any
     /// general method is called.
@@ -131,6 +135,51 @@ mod tests {
                     assert_eq!(layer.get(&key), None);
                 }
 
+                test_layer_iter!($scheme, $url, 16);
+                test_layer_iter!($scheme, $url, 64);
+                test_layer_iter!($scheme, $url, 256);
+                test_layer_iter!($scheme, $url, 4096);
+                test_layer_iter!($scheme, $url, 8196);
+                test_layer_iter!($scheme, $url, 65535);
+            }
+        };
+    }
+
+    macro_rules! test_layer_iter {
+        ($scheme:ident, $url:expr, $count:expr) => {
+            paste! {
+                #[test]
+                fn [<test_layer_iter_ $count _on_ $scheme>]() {
+                    let size: usize = $count as usize;
+                    let mut layer = get_layer($url).unwrap();
+
+                    for index in 0..size {
+                        let key: Key = index.into();
+                        let value: Value = format!("value {}", index).into();
+
+                        layer.put(&key, value.clone());
+                        assert_eq!(layer.get(&key), Some(value));
+                    }
+
+                    assert_eq!(layer.iter().count(), size);
+                }
+
+                #[test]
+                fn [<test_layer_iter_ $count _on_ $scheme _with_del>]() {
+                    let size: usize = $count as usize;
+                    let mut layer = get_layer($url).unwrap();
+
+                    for index in 0..size {
+                        let key: Key = index.into();
+                        let value: Value = format!("value {}", index).into();
+
+                        layer.put(&key, value.clone());
+                        layer.del(&key);
+                        assert_eq!(layer.get(&key), Some(Value::DELETED));
+                    }
+
+                    assert_eq!(layer.iter().count(), size);
+                }
             }
         };
     }

@@ -1,6 +1,6 @@
 //! The in-memory Layer implementation.
 use crate::{Key, Layer, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use url::Url;
 
 /// The in-memory Layer implementation.
@@ -46,6 +46,19 @@ impl Layer for MemLayer {
     fn del(&mut self, key: &Key) {
         self._del.insert(key.clone());
         self._mem.remove(key);
+    }
+
+    // ======== the iteration methods ========
+    /// Iterate over the key-value pairs in the layer which the order is not guaranteed.
+    fn iter(&self) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
+        let mut keys: BTreeSet<&Key> = BTreeSet::new();
+        keys.extend(self._mem.keys());
+        keys.extend(self._del.iter());
+
+        Box::new(
+            keys.into_iter()
+                .map(move |key| (key.clone(), self.get(&key).unwrap())),
+        )
     }
 
     // ======== the authenticated methods ========
