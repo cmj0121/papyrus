@@ -42,6 +42,15 @@ impl From<&str> for Value {
     }
 }
 
+impl From<String> for Value {
+    fn from(data: String) -> Self {
+        trace!("converting {} to value", data);
+
+        let data = data.as_bytes();
+        data.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

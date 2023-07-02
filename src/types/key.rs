@@ -6,7 +6,7 @@ use tracing::error;
 ///
 /// It is the fixed length and well-known type that is used as the primary
 /// key or index for the key-value pairs in Papyrus.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Key {
     /// The truth value
     BOOL(bool),
@@ -60,6 +60,12 @@ where
 {
     fn from(i: T) -> Self {
         Key::INT(i.into())
+    }
+}
+
+impl From<usize> for Key {
+    fn from(uid: usize) -> Self {
+        Key::UID(uid as u128)
     }
 }
 
