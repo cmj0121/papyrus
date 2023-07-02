@@ -1,5 +1,5 @@
 //! Value is the arbitrary length data used in Papyrus.
-use crate::{Converter, Error, Result};
+use crate::{Converter, Error, Packer, Result};
 use std::convert::From;
 use tracing::{trace, warn};
 
@@ -138,6 +138,25 @@ impl Converter for Value {
     }
 }
 
+impl Packer for Value {
+    /// Convert the type into binary format with type information.
+    fn pack(&self) -> Vec<u8> {
+        self.to_bytes()
+    }
+
+    /// Convert from binary format to the type, which the binary format contains the
+    /// type information.
+    fn unpack(data: &[u8]) -> Result<(Self, &[u8])>
+    where
+        Self: Sized,
+    {
+        let value = Self::from_bytes(data)?;
+        let size = value.cap();
+
+        Ok((value, &data[size..]))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,6 +178,15 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_value_unpack() {
+        let value: Value = Value::EMPTY;
+        let data: Vec<u8> = value.to_bytes();
+        let rest: &[u8] = &vec![];
+
+        assert_eq!(Value::unpack(&data), Ok((Value::EMPTY, rest)));
+    }
+
+    #[test]
     fn test_deleted_value() {
         let mut value: Value = Value::EMPTY;
         value.delete();
@@ -175,6 +203,17 @@ mod tests {
 
         assert_eq!(data.len(), value.cap());
         assert_eq!(Value::from_bytes(&data), Ok(Value::DELETED));
+    }
+
+    #[test]
+    fn test_deleted_value_packer() {
+        let mut value: Value = Value::EMPTY;
+        value.delete();
+
+        let data: Vec<u8> = value.to_bytes();
+        let rest: &[u8] = &vec![];
+
+        assert_eq!(Value::unpack(&data), Ok((Value::DELETED, rest)));
     }
 
     macro_rules! test_value {
@@ -194,6 +233,15 @@ mod tests {
                     assert_eq!(data.len(), value.cap());
                     assert_eq!(Value::from_bytes(&data), Ok(Value::RAW($data.as_bytes().to_vec())));
                 }
+
+                #[test]
+                fn [<test_value_ $name _packer>]() {
+                    let value: Value = $data.into();
+                    let data: Vec<u8> = value.pack();
+                    let rest: &[u8] = &vec![];
+
+                    assert_eq!(Value::unpack(&data), Ok((Value::RAW($data.as_bytes().to_vec()), rest)));
+                }
             }
         };
     }
@@ -201,4 +249,32 @@ mod tests {
     test_value!(empty, "");
     test_value!(single_char, "a");
     test_value!(multi_char, "aaaaaaaa");
+
+    macro_rules! test_value_unpack_iter {
+        ($count:expr) => {
+            paste! {
+                #[test]
+                fn [<test_value_unpack_iter_ $count>]() {
+                    let size: usize = $count;
+                    let mut data: Vec<u8> = vec![];
+
+                    for i in 0..size {
+                        let raw: String = "a".repeat(i);
+                        let value: Value = raw.into();
+                        data.extend(value.pack());
+                    }
+
+                    assert_eq!(Value::unpack_iter(&data).count(), size);
+                }
+            }
+        };
+    }
+
+    test_value_unpack_iter!(0);
+    test_value_unpack_iter!(1);
+    test_value_unpack_iter!(2);
+    test_value_unpack_iter!(16);
+    test_value_unpack_iter!(64);
+    test_value_unpack_iter!(4096);
+    test_value_unpack_iter!(65535);
 }

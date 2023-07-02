@@ -8,5 +8,5 @@ mod traits;
 mod value;
 
 pub use key::Key;
-pub use traits::Converter;
+pub use traits::{Converter, Packer};
 pub use value::Value;

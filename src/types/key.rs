@@ -1,7 +1,7 @@
 //! Key is the searchable and sortable data type used in Papyrus.
-use crate::{Converter, Error, Result};
+use crate::{Converter, Error, Packer, Result};
 use std::convert::From;
-use tracing::error;
+use tracing::{error, warn};
 
 /// Key is the searchable and sortable data type used in Papyrus.
 ///
@@ -132,6 +132,59 @@ impl Converter for Key {
     }
 }
 
+impl Packer for Key {
+    /// Convert the type into binary format with type information.
+    fn pack(&self) -> Vec<u8> {
+        let typ: u8 = match self {
+            Key::BOOL(_) => 0,
+            Key::INT(_) => 1,
+            Key::UID(_) => 2,
+            Key::STR(_) => 3,
+            Key::TEXT(_) => 4,
+        };
+
+        let mut data = vec![typ];
+
+        data.extend(self.to_bytes());
+        data
+    }
+
+    /// Convert from binary format to the type, which the binary format contains the
+    /// type information.
+    fn unpack(data: &[u8]) -> Result<(Self, &[u8])>
+    where
+        Self: Sized,
+    {
+        if data.len() < 2 {
+            return Err(Error::InvalidArgument);
+        }
+
+        let rest: &[u8] = &data[1..];
+        let size: usize = match data[0] {
+            0 => 1,
+            1 => 8,
+            2 => 16,
+            3 => 64,
+            4 => 256,
+            _ => return Err(Error::InvalidArgument),
+        };
+
+        if rest.len() < size {
+            warn!(
+                "expected the length of rest data is {}, but got {}",
+                size,
+                rest.len()
+            );
+            return Err(Error::InvalidArgument);
+        }
+
+        let (data, rest) = rest.split_at(size);
+        let key = Key::from_bytes(data)?;
+
+        Ok((key, rest))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,6 +206,14 @@ mod tests {
 
                     assert_eq!(data.len(), key.cap());
                     assert_eq!(Key::from_bytes(&data), Ok(key));
+                }
+
+                #[test]
+                fn [<test_key_packer_ $type:lower _ $value>]() {
+                    let key: Key = $value.into();
+                    let rest: &[u8] = &[];
+
+                    assert_eq!(Key::unpack(&key.pack()), Ok((key, rest)));
                 }
             }
         };
@@ -176,4 +237,31 @@ mod tests {
     test_key_convert!(STR, "");
     test_key_convert!(STR, "a");
     test_key_convert!(STR, "aaaaaa");
+
+    macro_rules! test_key_unpack_iter {
+        ($count:expr) => {
+            paste! {
+                #[test]
+                fn [<test_key_unpack_iter_ $count>]() {
+                    let size: usize = $count;
+                    let mut data: Vec<u8> = vec![];
+
+                    for i in 0..size {
+                        let key: Key = i.into();
+                        data.extend(key.pack());
+                    }
+
+                    assert_eq!(Key::unpack_iter(&data).count(), size);
+                }
+            }
+        };
+    }
+
+    test_key_unpack_iter!(0);
+    test_key_unpack_iter!(1);
+    test_key_unpack_iter!(2);
+    test_key_unpack_iter!(16);
+    test_key_unpack_iter!(64);
+    test_key_unpack_iter!(4096);
+    test_key_unpack_iter!(65535);
 }
