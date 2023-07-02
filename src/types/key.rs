@@ -1,4 +1,5 @@
 //! Key is the searchable and sortable data type used in Papyrus.
+use crate::{Converter, Error, Result};
 use std::convert::From;
 use tracing::error;
 
@@ -22,19 +23,6 @@ pub enum Key {
 
     /// The 256-bytes null-terminated string
     TEXT(String),
-}
-
-impl Key {
-    /// the capacity of the Key type
-    pub fn cap(&self) -> usize {
-        match self {
-            Key::BOOL(_) => 1,
-            Key::INT(_) => 8,
-            Key::UID(_) => 16,
-            Key::STR(_) => 64,
-            Key::TEXT(_) => 256,
-        }
-    }
 }
 
 // ======== value-to-value conversions ========
@@ -89,6 +77,61 @@ impl From<&str> for Key {
     }
 }
 
+// ======== the converter ========
+impl Converter for Key {
+    /// the capacity of the type.
+    fn cap(&self) -> usize {
+        match self {
+            Key::BOOL(_) => 1,
+            Key::INT(_) => 8,
+            Key::UID(_) => 16,
+            Key::STR(_) => 64,
+            Key::TEXT(_) => 256,
+        }
+    }
+
+    /// Convert the type into binary format. It only contains the data of the type
+    /// itself, not including the type information.
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut data: Vec<u8> = match self {
+            Key::BOOL(b) => vec![*b as u8],
+            Key::INT(i) => i.to_ne_bytes().to_vec(),
+            Key::UID(uid) => uid.to_ne_bytes().to_vec(),
+            Key::STR(s) => s.as_bytes().to_vec(),
+            Key::TEXT(s) => s.as_bytes().to_vec(),
+        };
+
+        data.extend(vec![0; self.cap() - data.len()]);
+        data
+    }
+
+    /// Convert from binary format to the type. It only contains the data of the type
+    /// itself, not including the type information.
+    fn from_bytes(data: &[u8]) -> Result<Self> {
+        match data.len() {
+            1 => Ok(Key::BOOL(data[0] != 0)),
+            8 => {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(data);
+                Ok(Key::INT(i64::from_ne_bytes(buf)))
+            }
+            16 => {
+                let mut buf = [0u8; 16];
+                buf.copy_from_slice(data);
+                Ok(Key::UID(u128::from_ne_bytes(buf)))
+            }
+            64 | 256 => match data.iter().rposition(|&b| b != 0) {
+                Some(index) => {
+                    let s = String::from_utf8_lossy(&data[..index + 1]).to_string();
+                    Ok(Key::STR(s))
+                }
+                None => Ok(Key::STR("".to_string())),
+            },
+            _ => Err(Error::InvalidArgument),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,8 +145,23 @@ mod tests {
                     let key: Key = $value.into();
                     assert_eq!(key, Key::$type($value.into()));
                 }
+
+                #[test]
+                fn [<test_key_converter_ $type:lower _ $value>]() {
+                    let key: Key = $value.into();
+                    let data: Vec<u8> = key.to_bytes();
+
+                    assert_eq!(data.len(), key.cap());
+                    assert_eq!(Key::from_bytes(&data), Ok(key));
+                }
             }
         };
+    }
+
+    #[test]
+    fn test_invalid_key_convert() {
+        let v: Vec<u8> = vec![1, 2, 3];
+        assert_eq!(Key::from_bytes(&v), Err(Error::InvalidArgument));
     }
 
     test_key_convert!(BOOL, true);
@@ -117,4 +175,5 @@ mod tests {
     test_key_convert!(UID, 340282366920938463463374607431768211455u128);
     test_key_convert!(STR, "");
     test_key_convert!(STR, "a");
+    test_key_convert!(STR, "aaaaaa");
 }

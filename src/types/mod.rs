@@ -4,7 +4,9 @@
 //! the search and sortable Key and arbitrary length Value.
 
 mod key;
+mod traits;
 mod value;
 
 pub use key::Key;
+pub use traits::Converter;
 pub use value::Value;
