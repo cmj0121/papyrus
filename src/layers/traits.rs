@@ -1,6 +1,6 @@
 //! The abstraction of the Layer.
 use crate::layers::MemLayer;
-use crate::{Key, Value};
+use crate::{Key, Result, Value};
 use tracing::{trace, warn};
 use url::Url;
 
@@ -11,7 +11,7 @@ use url::Url;
 /// simple to use and easy to implement.
 pub trait Layer {
     /// Open Layer by the passed URL.
-    fn open(url: Url) -> Self
+    fn open(url: &Url) -> Result<Self>
     where
         Self: Sized;
 
@@ -57,7 +57,13 @@ pub fn get_layer(url: &str) -> Option<Box<dyn Layer>> {
 
     match Url::parse(url) {
         Ok(url) => match url.scheme() {
-            "mem" => Some(Box::new(MemLayer::open(url))),
+            "mem" => match MemLayer::open(&url) {
+                Ok(layer) => Some(Box::new(layer)),
+                Err(err) => {
+                    trace!("failed to open {}: {:?}", &url, err);
+                    None
+                }
+            },
             _ => {
                 warn!("cannot find scheme {} for layer", url.scheme());
                 None

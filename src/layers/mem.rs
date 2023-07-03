@@ -1,5 +1,5 @@
 //! The in-memory Layer implementation.
-use crate::{Key, Layer, Value};
+use crate::{Key, Layer, Result, Value};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use url::Url;
 
@@ -17,8 +17,8 @@ pub struct MemLayer {
 }
 
 impl Layer for MemLayer {
-    fn open(_: Url) -> Self {
-        MemLayer::default()
+    fn open(_: &Url) -> Result<Self> {
+        Ok(MemLayer::default())
     }
 
     // ======== the general methods ========
