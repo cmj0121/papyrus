@@ -11,15 +11,17 @@ use tracing::{debug, error, trace, warn};
 ///
 /// ```peg
 /// expression = { space* ~ command ~ space* ~ EOI }
-/// command    = { put_command | get_command | del_command }
+/// command    = { put_command | get_command | del_command | iter_command }
 ///
-/// put_command = { put ~ key ~ space ~ value }
-/// get_command = { get ~ keys }
-/// del_command = { del ~ keys }
+/// put_command  = { put ~ key ~ space ~ value }
+/// get_command  = { get ~ keys }
+/// del_command  = { del ~ keys }
+/// iter_command = { ord ~ ( space ~ key )? }
 ///
 /// put = { ( ( ^"put" ~ space ) | "+" ~ ( space )? ) }
 /// get = { ( ( ^"get" ~ space ) | "?" ~ ( space )? ) }
 /// del = { ( ( ^"del" ~ space ) | "-" ~ ( space )? ) }
+/// ord = { ^"asc" | ^"desc" }
 ///
 /// space = { SPACE_SEPARATOR+ }
 /// keys  = { key ~ ( space ~ key)* }
@@ -140,6 +142,23 @@ impl Papyrus {
                     .collect();
 
                 println!("put_command: {:?}", key_value);
+            }
+            Rule::iter_command => {
+                let ord: String = pair
+                    .clone()
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::ord)
+                    .map(|p| p.as_str().to_string())
+                    .next()
+                    .unwrap();
+                let key: Option<String> = pair
+                    .clone()
+                    .into_inner()
+                    .filter(|p| p.as_rule() == Rule::key)
+                    .map(|p| p.as_str().to_string())
+                    .next();
+
+                println!("iter_command: {:?} {:?}", ord, key);
             }
             _ => {
                 warn!("invalid command: {:?}", pair);
