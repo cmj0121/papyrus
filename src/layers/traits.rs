@@ -32,6 +32,15 @@ pub trait Layer {
     /// Iterate over the key-value pairs in the layer which the order is not guaranteed.
     fn iter(&self) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
 
+    /// Iterate over the key-value pairs with the ascending order of the key, pass the optional
+    /// based key to start the iteration.
+    fn forward<'a>(&'a self, base: Option<&'a Key>) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
+
+    /// Iterate over the key-value pairs with the descending order of the key, pass the optional
+    /// based key to start the iteration.
+    fn backward<'a>(&'a self, base: Option<&'a Key>)
+        -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
+
     // ======== the authenticated methods ========
     /// Remove the existing data and files. The layer may not be initialized until any
     /// general method is called.
@@ -135,6 +144,10 @@ mod tests {
                     assert_eq!(layer.get(&key), None);
                 }
 
+                test_layer_iter!($scheme, $url, 0);
+                test_layer_iter!($scheme, $url, 1);
+                test_layer_iter!($scheme, $url, 2);
+                test_layer_iter!($scheme, $url, 3);
                 test_layer_iter!($scheme, $url, 16);
                 test_layer_iter!($scheme, $url, 64);
                 test_layer_iter!($scheme, $url, 256);
@@ -179,6 +192,68 @@ mod tests {
                     }
 
                     assert_eq!(layer.iter().count(), size);
+                }
+
+                #[test]
+                fn [<test_layer_forward_ $count _on_ $scheme>]() {
+                    let size: usize = $count as usize;
+                    let mut layer = get_layer($url).unwrap();
+                    let mut base: Option<Key> = None;
+
+                    for index in 0..size {
+                        let key: Key = index.into();
+                        let value: Value = format!("value {}", index).into();
+
+                        layer.put(&key, value.clone());
+                        assert_eq!(layer.get(&key), Some(value));
+
+                        if index == size / 2 {
+                            base = Some(key);
+                        }
+                    }
+
+                    assert_eq!(layer.forward(base.as_ref()).count(), size - size / 2);
+
+                    let is_sorted = layer
+                        .forward(base.as_ref())
+                        .map(|(key, _)| key)
+                        .collect::<Vec<_>>()
+                        .windows(2)
+                        .all(|w| w[0] < w[1]);
+                    assert_eq!(is_sorted, true);
+                }
+
+                #[test]
+                fn [<test_layer_backward_ $count _on_ $scheme>]() {
+                    let size: usize = $count as usize;
+                    let mut layer = get_layer($url).unwrap();
+                    let mut base: Option<Key> = None;
+
+                    for index in 0..size {
+                        let key: Key = index.into();
+                        let value: Value = format!("value {}", index).into();
+
+                        layer.put(&key, value.clone());
+                        assert_eq!(layer.get(&key), Some(value));
+
+                        if index == size / 2 {
+                            base = Some(key);
+                        }
+                    }
+
+                    let shift: usize = match size {
+                        0 => 0,
+                        _ => 1 - size  %2,
+                    };
+                    assert_eq!(layer.backward(base.as_ref()).count(), size - size / 2 + shift);
+
+                    let is_sorted = layer
+                        .backward(base.as_ref())
+                        .map(|(key, _)| key)
+                        .collect::<Vec<_>>()
+                        .windows(2)
+                        .all(|w| w[0] > w[1]);
+                    assert_eq!(is_sorted, true);
                 }
             }
         };
