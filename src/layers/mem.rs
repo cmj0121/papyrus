@@ -1,5 +1,5 @@
 //! The in-memory Layer implementation.
-use crate::{Key, Layer, Value};
+use crate::{Key, Layer, Result, Value};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use url::Url;
 
@@ -17,8 +17,8 @@ pub struct MemLayer {
 }
 
 impl Layer for MemLayer {
-    fn open(_: Url) -> Self {
-        MemLayer::default()
+    fn open(_: &Url) -> Result<Self> {
+        Ok(MemLayer::default())
     }
 
     // ======== the general methods ========
@@ -51,12 +51,50 @@ impl Layer for MemLayer {
     // ======== the iteration methods ========
     /// Iterate over the key-value pairs in the layer which the order is not guaranteed.
     fn iter(&self) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
+        let mut keys: HashSet<&Key> = HashSet::new();
+        keys.extend(self._mem.keys());
+        keys.extend(self._del.iter());
+
+        Box::new(
+            keys.into_iter()
+                .map(move |key| (key.clone(), self.get(&key).unwrap())),
+        )
+    }
+
+    /// Iterate over the key-value pairs with the ascending order of the key, pass the optional
+    /// based key to start the iteration.
+    fn forward<'a>(&'a self, base: Option<&'a Key>) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
         let mut keys: BTreeSet<&Key> = BTreeSet::new();
         keys.extend(self._mem.keys());
         keys.extend(self._del.iter());
 
         Box::new(
             keys.into_iter()
+                .filter(move |&x| match base {
+                    Some(base) => x >= base,
+                    None => true,
+                })
+                .map(move |key| (key.clone(), self.get(&key).unwrap())),
+        )
+    }
+
+    /// Iterate over the key-value pairs with the descending order of the key, pass the optional
+    /// based key to start the iteration.
+    fn backward<'a>(
+        &'a self,
+        base: Option<&'a Key>,
+    ) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
+        let mut keys: BTreeSet<&Key> = BTreeSet::new();
+        keys.extend(self._mem.keys());
+        keys.extend(self._del.iter());
+
+        Box::new(
+            keys.into_iter()
+                .filter(move |&x| match base {
+                    Some(base) => x <= base,
+                    None => true,
+                })
+                .rev()
                 .map(move |key| (key.clone(), self.get(&key).unwrap())),
         )
     }

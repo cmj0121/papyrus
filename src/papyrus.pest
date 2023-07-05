@@ -1,13 +1,16 @@
 expression = { space* ~ command ~ space* ~ EOI }
-command    = { put_command | get_command | del_command }
+command    = { put_command | get_command | del_command | iter_command }
 
-put_command = { put ~ key ~ space ~ value }
-get_command = { get ~ keys }
-del_command = { del ~ keys }
+put_command  = { put ~ key ~ space ~ value }
+get_command  = { get ~ keys }
+del_command  = { del ~ keys }
+iter_command = { ord ~ ( space ~ key )? }
 
 put = { ( ( ^"put" ~ space ) | "+" ~ ( space )? ) }
 get = { ( ( ^"get" ~ space ) | "?" ~ ( space )? ) }
 del = { ( ( ^"del" ~ space ) | "-" ~ ( space )? ) }
+ord = { ^"asc" | ^"desc" }
+
 
 space = { SPACE_SEPARATOR+ }
 keys  = { key ~ ( space ~ key)* }
