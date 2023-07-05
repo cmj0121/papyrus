@@ -1,6 +1,6 @@
 //! The basic file layer implementation for Papyrus.
 use crate::{Error, Result};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use tracing::warn;
 
 /// The basic file layer implementation for Papyrus.
@@ -15,10 +15,14 @@ use tracing::warn;
 ///   - version  the version of the file format, now is 1.
 ///   - type     the type of the file, depends on the layer implementation.
 ///   - flags    the extra flags of the file.
+///   - reserved the reserved bits.
+///   - checksum the checksum of the header.
 ///
 /// 0       8      16     24     32     40     48     56     64
 /// +------+------+------+------+------+------+------+------+
 /// |           MAGIC           |  VER | TYPE |    FLAGS    |
+/// +-------------------------------------------------------+
+/// |           RESERVED        |         CHECKSUM          |
 /// +-------------------------------------------------------+
 /// ~                                                       ~
 /// ~                         Data                          ~
@@ -31,6 +35,11 @@ pub struct FileLayer {
 
     /// the file descriptor of the file, which may not opened yet.
     file: Option<std::fs::File>,
+
+    /// the metadata of the file.
+    ver: Option<u8>,
+    typ: Option<u8>,
+    flags: Option<u16>,
 }
 
 #[allow(dead_code)]
@@ -38,24 +47,113 @@ impl FileLayer {
     /// the magic number of the file header.
     const MAGIC: [u8; 4] = [0x30, 0x14, 0x15, 0x92];
     /// the default version of the file header.
-    const VERSION: u8 = 0;
+    const VERSION: u8 = 1;
+    /// the total size of the header
+    const HEADER_SIZE: usize = 16;
 
     /// Create an new file layer by the specified file path.
     pub fn new(path: &str, meta: Option<(u8, u16)>) -> Result<Self> {
         let path = std::path::PathBuf::from(path);
-        let mut layer = Self { path, file: None };
+        let mut layer = Self {
+            path,
+            file: None,
+            typ: None,
+            flags: None,
+            ver: None,
+        };
 
         layer.open(meta)?;
         Ok(layer)
     }
 
+    /// Get the type of the file.
+    pub fn typ(&self) -> u8 {
+        self.typ.expect("file layer not opened")
+    }
+
+    /// Get the flags of the file.
+    pub fn flags(&self) -> u16 {
+        self.flags.expect("file layer not opened")
+    }
+
+    /// Read data from data section by the specified offset and length.
+    pub fn read_at(&mut self, buff: &mut [u8], offset: usize) -> Result<()> {
+        self.seek(offset)?;
+
+        let file = self.file.as_mut().expect("file layer not opened");
+        file.read_exact(buff)?;
+
+        Ok(())
+    }
+
+    /// Read all data from data section.
+    pub fn read_to_end(&mut self, buff: &mut Vec<u8>) -> Result<()> {
+        self.seek(0)?;
+
+        let file = self.file.as_mut().expect("file layer not opened");
+        file.read_to_end(buff)?;
+
+        Ok(())
+    }
+
+    /// Write data into data section by the specified offset and length.
+    pub fn write_at(&mut self, buff: &[u8], offset: usize) -> Result<()> {
+        self.seek(offset)?;
+
+        let file = self.file.as_mut().expect("file layer not opened");
+        file.write_all(buff)?;
+
+        Ok(())
+    }
+
+    /// Write data into the end of data section.
+    pub fn append(&mut self, buff: &[u8]) -> Result<()> {
+        // re-open the current file
+        let meta = (self.typ(), self.flags());
+        self.open(Some(meta))?;
+
+        let file = self.file.as_mut().expect("file layer not opened");
+        let _ = file.seek(SeekFrom::End(0))?;
+
+        file.write_all(buff)?;
+
+        Ok(())
+    }
+
+    /// Get the file descriptor of the current file, may reopen the file if not opened yet.
+    pub fn file(&mut self) -> &mut std::fs::File {
+        if let None = self.file {
+            let meta = Some((self.typ(), self.flags()));
+            let _ = self.open(meta);
+        }
+
+        self.file.as_mut().expect("file layer not opened")
+    }
+
+    /// Unlink the current file.
+    pub fn unlink(&mut self) {
+        if let Some(file) = &self.file {
+            let _ = file.sync_all();
+
+            drop(file);
+            self.file = None;
+        }
+
+        // there is no guarantee that the file is immediately deleted,
+        // in this case we can only ignore the error
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+/// The private methods of FileLayer
+impl FileLayer {
+    /// Open the current file with the optional meta information.
     fn open(&mut self, meta: Option<(u8, u16)>) -> Result<()> {
         if let Some(_) = self.file {
             return Ok(());
         }
 
         let exists = self.path.exists();
-
         let mut file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -65,16 +163,24 @@ impl FileLayer {
         match (exists, meta) {
             (true, _) => {
                 // check the file header
-                let mut header = [0u8; 8];
+                let mut header = [0u8; Self::HEADER_SIZE];
 
                 file.read_exact(&mut header)?;
-                Self::verify(header, meta)?;
+
+                let (ver, typ, flags) = Self::verify(header, meta)?;
+                self.ver = Some(ver);
+                self.typ = Some(typ);
+                self.flags = Some(flags);
             }
             (false, Some((typ, flags))) => {
                 let header = FileLayer::header(typ, flags);
 
                 // write the file header
                 file.write_all(&header)?;
+
+                self.ver = Some(Self::VERSION);
+                self.typ = Some(typ);
+                self.flags = Some(flags);
             }
             _ => {
                 warn!("cannot open layer without meta");
@@ -86,20 +192,43 @@ impl FileLayer {
         Ok(())
     }
 
+    /// Change the current position of file descriptor.
+    fn seek(&mut self, offset: usize) -> Result<()> {
+        // re-open the current file
+        let meta = (self.typ(), self.flags());
+        self.open(Some(meta))?;
+
+        let file = self.file.as_mut().expect("file layer not opened");
+        let _ = file.seek(SeekFrom::Start((Self::HEADER_SIZE + offset) as u64))?;
+
+        Ok(())
+    }
+
     /// Create the file header.
-    fn header(typ: u8, flags: u16) -> [u8; 8] {
-        let mut header = [0u8; 8];
+    fn header(typ: u8, flags: u16) -> [u8; Self::HEADER_SIZE] {
+        let mut header = [0u8; Self::HEADER_SIZE];
 
         header[0..4].copy_from_slice(&Self::MAGIC);
         header[4] = Self::VERSION;
         header[5] = typ;
         header[6..8].copy_from_slice(&flags.to_be_bytes());
+        // reserved bits
+        let checksum = Self::checksum(&header[0..12]);
+        header[12..16].copy_from_slice(&checksum.to_be_bytes());
 
         header
     }
 
     /// Verify the current header is valid or not
-    fn verify(header: [u8; 8], meta: Option<(u8, u16)>) -> Result<()> {
+    fn verify(header: [u8; Self::HEADER_SIZE], meta: Option<(u8, u16)>) -> Result<(u8, u8, u16)> {
+        let checksum = u32::from_be_bytes([header[12], header[13], header[14], header[15]]);
+        let verify = Self::checksum(&header[0..12]);
+
+        if checksum != verify {
+            warn!("invalid file header checksum: {} != {}", checksum, verify);
+            return Err(Error::InvalidArgument);
+        }
+
         let hdr_magic = &header[0..4];
         let hdr_ver = header[4];
         let hdr_typ = header[5];
@@ -116,7 +245,13 @@ impl FileLayer {
             return Err(Error::InvalidArgument);
         }
 
-        Ok(())
+        Ok((hdr_ver, hdr_typ, hdr_flags))
+    }
+
+    /// Calculate the checksum to u32.
+    fn checksum(data: &[u8]) -> u32 {
+        let chksum = crc::Crc::<u32>::new(&crc::CRC_32_CKSUM);
+        chksum.checksum(data)
     }
 }
 
