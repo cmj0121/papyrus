@@ -1,6 +1,6 @@
 SUBDIR :=
 
-.PHONY: all clean test run build release install upgrade help
+.PHONY: all clean test bench run build release install upgrade help
 
 all: $(SUBDIR) 		# default action
 	@[ -f .git/hooks/pre-commit ] || pre-commit install --install-hooks
@@ -10,8 +10,11 @@ clean: $(SUBDIR)	# clean-up environment
 	@find . -name '*.sw[po]' -delete
 	cargo clean
 
-test: $(VENV)		# run test
+test: 				# run test
 	cargo test
+
+bench: 				# run benchmark
+	cargo bench
 
 run:				# run in the local environment
 	cargo run
