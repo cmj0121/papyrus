@@ -265,3 +265,114 @@ impl Drop for FileLayer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestContext {
+        layer: FileLayer,
+    }
+
+    impl TestContext {
+        fn new(file: &str, meta: Option<(u8, u16)>) -> Self {
+            let layer = FileLayer::new(file, meta);
+
+            assert_eq!(layer.is_ok(), true);
+            Self {
+                layer: layer.unwrap(),
+            }
+        }
+    }
+
+    impl Drop for TestContext {
+        fn drop(&mut self) {
+            std::fs::remove_file(&self.layer.path).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_create_file_layer() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+
+        let file = "test_create_file_layer";
+        let ctx = TestContext::new(file, Some((typ, flags)));
+
+        let path = std::path::PathBuf::from(file);
+
+        assert_eq!(ctx.layer.path, path);
+        assert_eq!(ctx.layer.typ(), typ);
+        assert_eq!(ctx.layer.flags(), flags);
+    }
+
+    #[test]
+    fn test_open_file_layer() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+
+        let file = "test_open_file_layer";
+        let mut ctx = TestContext::new(file, Some((typ, flags)));
+        drop(&ctx.layer);
+
+        ctx.layer = FileLayer::new(file, None).unwrap();
+        let path = std::path::PathBuf::from(file);
+
+        assert_eq!(ctx.layer.path, path);
+        assert_eq!(ctx.layer.typ(), typ);
+        assert_eq!(ctx.layer.flags(), flags);
+    }
+
+    #[test]
+    fn test_read_write_at() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+
+        let file = "test_read_write_at";
+        let mut ctx = TestContext::new(file, Some((typ, flags)));
+
+        let data: &[u8] = &[0x01, 0x02, 0x03, 0x04];
+        let mut buff: [u8; 4] = [0u8; 4];
+
+        assert_eq!(ctx.layer.write_at(data, 0), Ok(()));
+        assert_eq!(ctx.layer.read_at(&mut buff, 0), Ok(()));
+        assert_eq!(buff, data);
+    }
+
+    #[test]
+    fn test_read_to_end() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+
+        let file = "test_read_to_end";
+        let mut ctx = TestContext::new(file, Some((typ, flags)));
+
+        let data: &[u8] = &[0x01, 0x02, 0x03, 0x04];
+        let mut buff: Vec<u8> = Vec::new();
+
+        assert_eq!(ctx.layer.write_at(data, 0), Ok(()));
+        assert_eq!(ctx.layer.read_to_end(&mut buff), Ok(()));
+        assert_eq!(buff, data);
+    }
+
+    #[test]
+    fn test_write_append() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+
+        let file = "test_write_append";
+        let mut ctx = TestContext::new(file, Some((typ, flags)));
+
+        let data: &[u8] = &[0x01, 0x02, 0x03, 0x04];
+        let mut buff: [u8; 4] = [0u8; 4];
+
+        assert_eq!(ctx.layer.write_at(data, 0), Ok(()));
+        assert_eq!(ctx.layer.append(data), Ok(()));
+
+        assert_eq!(ctx.layer.read_at(&mut buff, 0), Ok(()));
+        assert_eq!(buff, data);
+
+        assert_eq!(ctx.layer.read_at(&mut buff, 4), Ok(()));
+        assert_eq!(buff, data);
+    }
+}
