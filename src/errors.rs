@@ -14,6 +14,9 @@ pub enum Error {
     /// Invalid Argument
     InvalidArgument,
 
+    /// Resource Locked
+    Locked,
+
     /// I/O Error
     IOError(String),
 }

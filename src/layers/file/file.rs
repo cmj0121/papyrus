@@ -15,14 +15,14 @@ use tracing::warn;
 ///   - version  the version of the file format, now is 1.
 ///   - type     the type of the file, depends on the layer implementation.
 ///   - flags    the extra flags of the file.
-///   - reserved the reserved bits.
+///   - pid      the PID of the current process.
 ///   - checksum the checksum of the header.
 ///
 /// 0       8      16     24     32     40     48     56     64
 /// +------+------+------+------+------+------+------+------+
 /// |           MAGIC           |  VER | TYPE |    FLAGS    |
 /// +-------------------------------------------------------+
-/// |           RESERVED        |         CHECKSUM          |
+/// |           PID             |         CHECKSUM          |
 /// +-------------------------------------------------------+
 /// ~                                                       ~
 /// ~                         Data                          ~
@@ -173,7 +173,7 @@ impl FileLayer {
                 self.flags = Some(flags);
             }
             (false, Some((typ, flags))) => {
-                let header = FileLayer::header(typ, flags);
+                let header = FileLayer::header(typ, flags, false);
 
                 // write the file header
                 file.write_all(&header)?;
@@ -189,7 +189,52 @@ impl FileLayer {
         };
 
         self.file = Some(file);
+
+        self.lock()?;
         Ok(())
+    }
+
+    /// Lock the current file with the PID of the current process.
+    /// It modify the file header and erase when the process exits.
+    fn lock(&mut self) -> Result<()> {
+        if self.locked() {
+            // file already open and not locked by current process
+            return Err(Error::Locked);
+        }
+
+        let header = FileLayer::header(self.typ(), self.flags(), true);
+        let file = self.file();
+
+        file.seek(SeekFrom::Start(0))?;
+        file.write_all(&header)?;
+
+        Ok(())
+    }
+
+    /// Unlink the current file and erase PID on the file header.
+    fn unlock(&mut self) -> Result<()> {
+        let header = FileLayer::header(self.typ(), self.flags(), false);
+        let file = self.file();
+
+        file.seek(SeekFrom::Start(0))?;
+        file.write_all(&header)?;
+
+        Ok(())
+    }
+
+    /// check file locked by the current process.
+    fn locked(&mut self) -> bool {
+        let mut header = [0u8; Self::HEADER_SIZE];
+        let file = self.file();
+
+        match file.read_exact(&mut header) {
+            Ok(_) => {
+                let pid: u32 = std::process::id();
+
+                pid == u32::from_be_bytes([header[8], header[9], header[10], header[11]])
+            }
+            Err(_) => false,
+        }
     }
 
     /// Change the current position of file descriptor.
@@ -205,14 +250,19 @@ impl FileLayer {
     }
 
     /// Create the file header.
-    fn header(typ: u8, flags: u16) -> [u8; Self::HEADER_SIZE] {
+    fn header(typ: u8, flags: u16, locked: bool) -> [u8; Self::HEADER_SIZE] {
         let mut header = [0u8; Self::HEADER_SIZE];
 
         header[0..4].copy_from_slice(&Self::MAGIC);
         header[4] = Self::VERSION;
         header[5] = typ;
         header[6..8].copy_from_slice(&flags.to_be_bytes());
-        // reserved bits
+
+        if locked {
+            let pid: u32 = std::process::id();
+            header[8..12].copy_from_slice(&pid.to_be_bytes());
+        }
+
         let checksum = Self::checksum(&header[0..12]);
         header[12..16].copy_from_slice(&checksum.to_be_bytes());
 
@@ -257,6 +307,8 @@ impl FileLayer {
 
 impl Drop for FileLayer {
     fn drop(&mut self) {
+        let _ = self.unlock();
+
         if let Some(file) = &self.file {
             let _ = file.sync_all();
 
