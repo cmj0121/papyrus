@@ -18,7 +18,7 @@ pub trait Layer {
     // ======== the general methods ========
     /// Get the value of the specified key, return None if the key does not exist.
     /// Note that the value may return if marked as deleted.
-    fn get(&self, key: &Key) -> Option<Value>;
+    fn get(&mut self, key: &Key) -> Option<Value>;
 
     /// Set the value of the specified key, which may overwrite and return the old value
     /// without any warning.
@@ -30,16 +30,21 @@ pub trait Layer {
 
     // ======== the iteration methods ========
     /// Iterate over the key-value pairs in the layer which the order is not guaranteed.
-    fn iter(&self) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
+    fn iter(&mut self) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
 
     /// Iterate over the key-value pairs with the ascending order of the key, pass the optional
     /// based key to start the iteration.
-    fn forward<'a>(&'a self, base: Option<&'a Key>) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
+    fn forward<'a>(
+        &'a mut self,
+        base: Option<&'a Key>,
+    ) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
 
     /// Iterate over the key-value pairs with the descending order of the key, pass the optional
     /// based key to start the iteration.
-    fn backward<'a>(&'a self, base: Option<&'a Key>)
-        -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
+    fn backward<'a>(
+        &'a mut self,
+        base: Option<&'a Key>,
+    ) -> Box<dyn Iterator<Item = (Key, Value)> + '_>;
 
     // ======== the authenticated methods ========
     /// Remove the existing data and files. The layer may not be initialized until any
@@ -94,7 +99,7 @@ mod tests {
                 #[test]
                 fn [<test_layer_get_empty_on_ $scheme>]() {
                     let key: Key = "key".into();
-                    let layer = get_layer($url).unwrap();
+                    let mut layer = get_layer($url).unwrap();
 
                     assert_eq!(layer.get(&key), None);
                 }
