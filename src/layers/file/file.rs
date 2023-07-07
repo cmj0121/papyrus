@@ -242,11 +242,13 @@ impl FileBaseLayer {
 
     /// Unlink the current file and erase PID on the file header.
     fn unlock(&mut self) -> Result<()> {
+        // only erase the PID when file exists
         let header = FileBaseLayer::header(self.typ(), self.flags(), false);
-        let file = self.file();
 
-        file.seek(SeekFrom::Start(0))?;
-        file.write_all(&header)?;
+        if let Some(file) = &mut self.file {
+            file.seek(SeekFrom::Start(0))?;
+            file.write_all(&header)?;
+        }
 
         Ok(())
     }
