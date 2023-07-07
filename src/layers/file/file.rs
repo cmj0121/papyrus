@@ -3,6 +3,10 @@ use crate::{Error, Result};
 use std::io::{Read, Seek, SeekFrom, Write};
 use tracing::warn;
 
+pub trait FileLayer {
+    const TYPE: u8;
+}
+
 /// The basic file layer implementation for Papyrus.
 ///
 /// This layer is designed to store key-value pairs in local and single file,
@@ -29,7 +33,7 @@ use tracing::warn;
 /// ~                                                       ~
 /// +-------------------------------------------------------+
 #[derive(Debug)]
-pub struct FileLayer {
+pub struct FileBaseLayer {
     /// the path of the file.
     path: std::path::PathBuf,
 
@@ -43,7 +47,7 @@ pub struct FileLayer {
 }
 
 #[allow(dead_code)]
-impl FileLayer {
+impl FileBaseLayer {
     /// the magic number of the file header.
     const MAGIC: [u8; 4] = [0x30, 0x14, 0x15, 0x92];
     /// the default version of the file header.
@@ -143,10 +147,20 @@ impl FileLayer {
         // in this case we can only ignore the error
         let _ = std::fs::remove_file(&self.path);
     }
+
+    /// Migrate from another file layer.
+    pub fn migrate_from_file(&mut self, path: &str) -> Result<()> {
+        self.close()?;
+
+        std::fs::rename(path, &self.path)?;
+        self.open(None)?;
+
+        Ok(())
+    }
 }
 
-/// The private methods of FileLayer
-impl FileLayer {
+/// The private methods of FileBaseLayer
+impl FileBaseLayer {
     /// Open the current file with the optional meta information.
     fn open(&mut self, meta: Option<(u8, u16)>) -> Result<()> {
         if let Some(_) = self.file {
@@ -173,7 +187,7 @@ impl FileLayer {
                 self.flags = Some(flags);
             }
             (false, Some((typ, flags))) => {
-                let header = FileLayer::header(typ, flags, false);
+                let header = FileBaseLayer::header(typ, flags, false);
 
                 // write the file header
                 file.write_all(&header)?;
@@ -194,6 +208,20 @@ impl FileLayer {
         Ok(())
     }
 
+    /// Close the opened file.
+    fn close(&mut self) -> Result<()> {
+        self.unlock()?;
+
+        if let Some(file) = &self.file {
+            let _ = file.sync_all();
+
+            drop(file);
+            self.file = None;
+        }
+
+        Ok(())
+    }
+
     /// Lock the current file with the PID of the current process.
     /// It modify the file header and erase when the process exits.
     fn lock(&mut self) -> Result<()> {
@@ -203,7 +231,7 @@ impl FileLayer {
             return Err(Error::Locked);
         }
 
-        let header = FileLayer::header(self.typ(), self.flags(), true);
+        let header = FileBaseLayer::header(self.typ(), self.flags(), true);
         let file = self.file();
 
         file.seek(SeekFrom::Start(0))?;
@@ -214,7 +242,7 @@ impl FileLayer {
 
     /// Unlink the current file and erase PID on the file header.
     fn unlock(&mut self) -> Result<()> {
-        let header = FileLayer::header(self.typ(), self.flags(), false);
+        let header = FileBaseLayer::header(self.typ(), self.flags(), false);
         let file = self.file();
 
         file.seek(SeekFrom::Start(0))?;
@@ -310,7 +338,7 @@ impl FileLayer {
     }
 }
 
-impl Drop for FileLayer {
+impl Drop for FileBaseLayer {
     fn drop(&mut self) {
         let _ = self.unlock();
 
@@ -328,12 +356,12 @@ mod tests {
     use super::*;
 
     struct TestContext {
-        layer: FileLayer,
+        layer: FileBaseLayer,
     }
 
     impl TestContext {
         fn new(file: &str, meta: Option<(u8, u16)>) -> Self {
-            let layer = FileLayer::new(file, meta);
+            let layer = FileBaseLayer::new(file, meta);
 
             assert_eq!(layer.is_ok(), true);
             Self {
@@ -372,7 +400,7 @@ mod tests {
         let mut ctx = TestContext::new(file, Some((typ, flags)));
         drop(&ctx.layer);
 
-        ctx.layer = FileLayer::new(file, None).unwrap();
+        ctx.layer = FileBaseLayer::new(file, None).unwrap();
         let path = std::path::PathBuf::from(file);
 
         assert_eq!(ctx.layer.path, path);

@@ -7,7 +7,6 @@ mod file;
 mod mem;
 mod traits;
 
+pub use file::get_file_layer;
 pub(crate) use mem::MemLayer;
 pub use traits::{get_layer, Layer};
-
-pub use file::FileLayer;

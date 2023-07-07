@@ -1,5 +1,5 @@
 //! The abstraction of the Layer.
-use crate::layers::MemLayer;
+use crate::layers::{get_file_layer, MemLayer};
 use crate::{Key, Result, Value};
 use tracing::{trace, warn};
 use url::Url;
@@ -69,6 +69,7 @@ pub fn get_layer(url: &str) -> Option<Box<dyn Layer>> {
                     None
                 }
             },
+            "wal" => get_file_layer(&url),
             _ => {
                 warn!("cannot find scheme {} for layer", url.scheme());
                 None
