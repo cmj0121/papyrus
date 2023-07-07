@@ -197,7 +197,8 @@ impl FileLayer {
     /// Lock the current file with the PID of the current process.
     /// It modify the file header and erase when the process exits.
     fn lock(&mut self) -> Result<()> {
-        if self.locked() {
+        let pid: u32 = std::process::id();
+        if self.locked(pid) {
             // file already open and not locked by current process
             return Err(Error::Locked);
         }
@@ -223,18 +224,22 @@ impl FileLayer {
     }
 
     /// check file locked by the current process.
-    fn locked(&mut self) -> bool {
+    fn locked(&mut self, pid: u32) -> bool {
         let mut header = [0u8; Self::HEADER_SIZE];
         let file = self.file();
 
-        match file.read_exact(&mut header) {
+        file.seek(SeekFrom::Start(0)).expect("seek file failed");
+        let resp = match file.read_exact(&mut header) {
             Ok(_) => {
-                let pid: u32 = std::process::id();
+                let locked_pid: u32 =
+                    u32::from_be_bytes([header[8], header[9], header[10], header[11]]);
 
-                pid == u32::from_be_bytes([header[8], header[9], header[10], header[11]])
+                !(locked_pid == 0 || pid == locked_pid)
             }
             Err(_) => false,
-        }
+        };
+
+        resp
     }
 
     /// Change the current position of file descriptor.
@@ -426,5 +431,40 @@ mod tests {
 
         assert_eq!(ctx.layer.read_at(&mut buff, 4), Ok(()));
         assert_eq!(buff, data);
+    }
+
+    #[test]
+    fn test_file_locked() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+        let pid: u32 = std::process::id();
+
+        let file = "test_file_locked";
+        let mut ctx = TestContext::new(file, Some((typ, flags)));
+        let layer = &mut ctx.layer;
+
+        assert_eq!(layer.locked(pid), false);
+        assert_eq!(layer.locked(0), true);
+    }
+
+    #[test]
+    fn test_file_lock_release() {
+        let typ: u8 = 1;
+        let flags: u16 = 0x1234;
+        let pid: u32 = std::process::id();
+
+        let file = "test_file_lock_release";
+        let mut ctx = TestContext::new(file, Some((typ, flags)));
+        let layer = &mut ctx.layer;
+
+        assert_eq!(layer.locked(pid), false);
+        assert_eq!(layer.locked(0), true);
+
+        // close and release the file lock
+        drop(&layer);
+        let _ = layer.open(None);
+
+        assert_eq!(layer.locked(pid), false);
+        assert_eq!(layer.locked(0), true);
     }
 }
