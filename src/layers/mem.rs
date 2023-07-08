@@ -1,6 +1,6 @@
 //! The in-memory Layer implementation.
 use crate::{Key, Layer, Result, Value};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use url::Url;
 
 /// The in-memory Layer implementation.
@@ -13,7 +13,7 @@ pub struct MemLayer {
     _mem: HashMap<Key, Value>,
 
     /// the pool to hold the deleted keys.
-    _del: HashSet<Key>,
+    _del: BTreeSet<Key>,
 }
 
 impl Layer for MemLayer {
@@ -24,7 +24,7 @@ impl Layer for MemLayer {
     // ======== the general methods ========
     /// Get the value of the specified key, return None if the key does not exist.
     /// Note that the value may return if marked as deleted.
-    fn get(&self, key: &Key) -> Option<Value> {
+    fn get(&mut self, key: &Key) -> Option<Value> {
         match self._mem.get(key) {
             Some(value) => Some(value.clone()),
             None => match self._del.get(key) {
@@ -37,40 +37,39 @@ impl Layer for MemLayer {
     /// Set the value of the specified key, which may overwrite and return the old value
     /// without any warning.
     fn put(&mut self, key: &Key, value: Value) -> Option<Value> {
-        self._del.remove(key);
+        self._del.insert(key.clone());
         self._mem.insert(key.clone(), value)
     }
 
     /// Delete the value of the specified key, which may not actually delete the value
     /// but mark it as deleted.
     fn del(&mut self, key: &Key) {
-        self._del.insert(key.clone());
         self._mem.remove(key);
     }
 
     // ======== the iteration methods ========
     /// Iterate over the key-value pairs in the layer which the order is not guaranteed.
-    fn iter(&self) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
-        let mut keys: HashSet<&Key> = HashSet::new();
-        keys.extend(self._mem.keys());
-        keys.extend(self._del.iter());
-
+    fn iter(&mut self) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
         Box::new(
-            keys.into_iter()
+            self._del
+                .clone()
+                .into_iter()
+                .rev()
                 .map(move |key| (key.clone(), self.get(&key).unwrap())),
         )
     }
 
     /// Iterate over the key-value pairs with the ascending order of the key, pass the optional
     /// based key to start the iteration.
-    fn forward<'a>(&'a self, base: Option<&'a Key>) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
-        let mut keys: BTreeSet<&Key> = BTreeSet::new();
-        keys.extend(self._mem.keys());
-        keys.extend(self._del.iter());
-
+    fn forward<'a>(
+        &'a mut self,
+        base: Option<&'a Key>,
+    ) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
         Box::new(
-            keys.into_iter()
-                .filter(move |&x| match base {
+            self._del
+                .clone()
+                .into_iter()
+                .filter(move |x| match base {
                     Some(base) => x >= base,
                     None => true,
                 })
@@ -81,16 +80,14 @@ impl Layer for MemLayer {
     /// Iterate over the key-value pairs with the descending order of the key, pass the optional
     /// based key to start the iteration.
     fn backward<'a>(
-        &'a self,
+        &'a mut self,
         base: Option<&'a Key>,
     ) -> Box<dyn Iterator<Item = (Key, Value)> + '_> {
-        let mut keys: BTreeSet<&Key> = BTreeSet::new();
-        keys.extend(self._mem.keys());
-        keys.extend(self._del.iter());
-
         Box::new(
-            keys.into_iter()
-                .filter(move |&x| match base {
+            self._del
+                .clone()
+                .into_iter()
+                .filter(move |x| match base {
                     Some(base) => x <= base,
                     None => true,
                 })
@@ -104,11 +101,13 @@ impl Layer for MemLayer {
     /// general method is called.
     fn unlink(&mut self) {
         self._mem.clear();
+        self._del.clear();
     }
 
     /// Remove all the data marked as deleted, reorganize the data and file, and make
     /// the layer compact.
     fn compact(&mut self) {
         self._del.clear();
+        self._del = self._mem.keys().cloned().collect();
     }
 }
