@@ -70,6 +70,7 @@ fn bench_layer_operation(c: &mut Criterion, url: &str) {
 
 pub fn layer_operation(c: &mut Criterion) {
     bench_layer_operation(c, "mem://");
+    bench_layer_operation(c, "wal://bench_wal");
 }
 
 criterion_group!(benches, layer_operation);

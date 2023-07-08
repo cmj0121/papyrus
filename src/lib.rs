@@ -10,4 +10,4 @@ mod types;
 
 pub use errors::{Error, Result};
 pub use layers::{get_layer, Layer};
-pub use types::{Converter, Key, Packer, Value};
+pub use types::{Converter, Key, Packer, Pair, Value};

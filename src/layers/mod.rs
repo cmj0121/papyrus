@@ -3,8 +3,10 @@
 //! `Layer` is the core of Papyrus. It is the main interface for interacting with
 //! the key-value pairs in Papyrus. It provides few methods and is designed to be
 //! simple to use.
+mod file;
 mod mem;
 mod traits;
 
+pub use file::get_file_layer;
 pub(crate) use mem::MemLayer;
 pub use traits::{get_layer, Layer};
