@@ -1,7 +1,8 @@
 //! The write-ahead log (WAL) persistence Layer.
 use super::file::{FileBaseLayer, FileLayer};
 use crate::{Key, Layer, Packer, Pair, Result, Value};
-use tracing::error;
+use std::collections::HashMap;
+use tracing::{error, warn};
 use url::Url;
 
 /// The write-ahead log (WAL) persistence Layer.
@@ -138,5 +139,37 @@ impl Layer for WALLayer {
 
     /// Remove all the data marked as deleted, reorganize the data and file, and make
     /// the layer compact.
-    fn compact(&mut self) {}
+    fn compact(&mut self) {
+        // iterate all the key-value pairs and remove the deleted data
+        let mut pairs: HashMap<Key, Value> = HashMap::new();
+
+        for (key, value) in self.iter() {
+            match value {
+                Value::DELETED => {
+                    pairs.remove(&key);
+                }
+                _ => {
+                    pairs.insert(key, value);
+                }
+            }
+        }
+
+        let path = format!("{}{}", self.base.path.display(), ".tmp");
+        let meta = (Self::TYPE, 0);
+        let mut backup = FileBaseLayer::new(&path, Some(meta)).unwrap();
+
+        // write the data into the backup file
+        for (key, value) in pairs {
+            let pair = Pair::new(key, value);
+            let _ = backup.append(&pair.pack());
+        }
+
+        drop(&backup);
+
+        // move the backup file to the original file
+        if let Err(err) = self.base.migrate_from_file(&path) {
+            warn!("migrate data got error: {:?}", err);
+            return;
+        }
+    }
 }

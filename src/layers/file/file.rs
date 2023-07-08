@@ -35,7 +35,7 @@ pub trait FileLayer {
 #[derive(Debug)]
 pub struct FileBaseLayer {
     /// the path of the file.
-    path: std::path::PathBuf,
+    pub path: std::path::PathBuf,
 
     /// the file descriptor of the file, which may not opened yet.
     file: Option<std::fs::File>,

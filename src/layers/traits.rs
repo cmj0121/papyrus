@@ -194,7 +194,6 @@ mod tests {
                 test_layer_iter!($scheme, $url, 256);
                 test_layer_iter!($scheme, $url, 4096);
                 test_layer_iter!($scheme, $url, 8196);
-                // test_layer_iter!($scheme, $url, 65535);
             }
         };
     }
