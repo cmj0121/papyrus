@@ -1,10 +1,12 @@
 [workspace]
 members = [
     "papyrus",
+	"revdb",
 ]
 
 [patch.crates-io]
 papyrus = { path = "papyrus" }
+revdb = { path = "revdb" }
 
 [profile.release]
 lto = true
