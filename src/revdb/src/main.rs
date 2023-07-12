@@ -5,12 +5,12 @@ use tracing::trace;
 /// The command-line tool for RevDB.
 #[derive(Debug, ClapParser)]
 #[command(author, version, about, long_about = None)]
-pub struct RevDB {
+pub struct RevDBCli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
 
-impl RevDB {
+impl RevDBCli {
     /// Run the RevDB on the command-line. It will exit the process with the exit code.
     pub fn run_and_exit(&self) {
         let code = self.run();
@@ -60,6 +60,6 @@ impl RevDB {
 }
 
 fn main() {
-    let revdb = RevDB::parse();
+    let revdb = RevDBCli::parse();
     revdb.run_and_exit();
 }
