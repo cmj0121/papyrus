@@ -779,6 +779,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "clap-verbosity-flag",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
