@@ -1,3 +1,8 @@
+//! RevDB: the embeddable, persistent, and revision storage.
+use clap::Parser;
+mod cli;
+
 fn main() {
-    println!("Hello, world!");
+    let revdb = cli::RevDB::parse();
+    revdb.run_and_exit();
 }
