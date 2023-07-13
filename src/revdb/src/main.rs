@@ -1,9 +1,12 @@
 //! RevDB: the embeddable, persistent, and revision storage.
 use atty::Stream;
 use clap::Parser as ClapParser;
+use pest::Parser;
 use pest_derive::Parser as PestParser;
 use rustyline::{error::ReadlineError, DefaultEditor};
-use tracing::{error, trace};
+use tracing::{error, info, trace};
+
+use revdb::{Error, Result};
 
 /// The PEG based parser for RevDB CLI.
 #[derive(PestParser)]
@@ -26,10 +29,20 @@ impl RevDBCli {
     }
 
     /// Evaluate the given command and return the exit code.
-    pub fn eval(&self, command: &str) -> i32 {
+    pub fn eval(&self, command: &str) -> Result<()> {
         trace!("eval command: {}", command);
 
-        0
+        match RevDBParser::parse(Rule::expression, command) {
+            Err(err) => {
+                info!("invalid syntax: {}", err);
+                return Err(Error::InvalidCommand);
+            }
+            Ok(_) => {
+                // execute the command
+            }
+        }
+
+        Ok(())
     }
 
     // ======== private methods ========
@@ -54,9 +67,17 @@ impl RevDBCli {
             let readline = rl.readline("revdb> ");
 
             match readline {
-                Ok(line) => {
-                    let _ = self.eval(&line);
-                }
+                Ok(line) => match self.eval(&line) {
+                    Ok(_) => {
+                        // add to history
+                    }
+                    Err(Error::InvalidCommand) => {
+                        println!("invalid command: {}", line);
+                    }
+                    Err(err) => {
+                        println!("eval error: {:?}", err);
+                    }
+                },
                 Err(ReadlineError::Interrupted) => break,
                 Err(ReadlineError::Eof) => break,
                 Err(err) => {
