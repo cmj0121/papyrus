@@ -12,4 +12,7 @@ pub enum Error {
 
     /// Invalid Command
     InvalidCommand,
+
+    /// Stop the remaining execution
+    StopExecution,
 }

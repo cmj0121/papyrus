@@ -1,22 +1,84 @@
 //! RevDB: the embeddable, persistent, and revision storage.
 use atty::Stream;
 use clap::Parser as ClapParser;
-use pest::Parser;
+use pest::{iterators::Pair, Parser};
 use pest_derive::Parser as PestParser;
 use rustyline::{error::ReadlineError, DefaultEditor};
-use tracing::{error, info, trace};
+use std::convert::TryFrom;
+use tracing::{error, info, trace, warn};
 
 use revdb::{Error, Result};
 
 /// The PEG based parser for RevDB CLI.
 #[derive(PestParser)]
 #[grammar = "revdb.pest"]
-pub struct RevDBParser;
+struct RevDBParser;
+
+/// The exactly command to execute
+#[derive(Debug, PartialEq)]
+enum Command {
+    /// exit the program
+    Exit,
+}
+
+impl TryFrom<&str> for Command {
+    type Error = Error;
+
+    fn try_from(command: &str) -> Result<Self> {
+        match RevDBParser::parse(Rule::expression, command) {
+            Err(err) => {
+                info!("invalid syntax: {}", err);
+                return Err(Error::InvalidCommand);
+            }
+            Ok(pairs) => {
+                let expression = pairs
+                    .filter(|p| p.as_rule() == Rule::expression)
+                    .next()
+                    .expect("expression pair not found");
+
+                let command = expression
+                    .into_inner()
+                    .next()
+                    .expect("command pair not found");
+
+                command.try_into()
+            }
+        }
+    }
+}
+
+impl TryFrom<Pair<'_, Rule>> for Command {
+    type Error = Error;
+
+    fn try_from(pair: Pair<'_, Rule>) -> Result<Self> {
+        trace!(
+            "try convert {} ({:?}) to command",
+            pair.as_str(),
+            pair.as_rule()
+        );
+
+        match pair.as_rule() {
+            Rule::command | Rule::cmd_system => {
+                let subcmd = pair
+                    .into_inner()
+                    .next()
+                    .expect("sub-command pair not found");
+
+                subcmd.try_into()
+            }
+            Rule::cmd_exit => Ok(Command::Exit),
+            _ => {
+                warn!("not implemented: {:?}", pair.as_str());
+                Err(Error::NotImplemented)
+            }
+        }
+    }
+}
 
 /// The command-line tool for RevDB.
 #[derive(Debug, ClapParser)]
 #[command(author, version, about, long_about = None)]
-pub struct RevDBCli {
+struct RevDBCli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
@@ -32,17 +94,10 @@ impl RevDBCli {
     pub fn eval(&self, command: &str) -> Result<()> {
         trace!("eval command: {}", command);
 
-        match RevDBParser::parse(Rule::expression, command) {
-            Err(err) => {
-                info!("invalid syntax: {}", err);
-                return Err(Error::InvalidCommand);
-            }
-            Ok(_) => {
-                // execute the command
-            }
+        let command = Command::try_from(command)?;
+        match command {
+            Command::Exit => Err(Error::StopExecution),
         }
-
-        Ok(())
     }
 
     // ======== private methods ========
@@ -73,6 +128,9 @@ impl RevDBCli {
                     }
                     Err(Error::InvalidCommand) => {
                         println!("invalid command: {}", line);
+                    }
+                    Err(Error::StopExecution) => {
+                        break;
                     }
                     Err(err) => {
                         println!("eval error: {:?}", err);
