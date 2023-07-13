@@ -1,6 +1,6 @@
 //! RevDB: the embeddable, persistent, and revision storage.
 use atty::Stream;
-use clap::Parser as ClapParser;
+use clap::{Parser as ClapParser, Subcommand};
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser as PestParser;
 use rustyline::{error::ReadlineError, DefaultEditor};
@@ -75,12 +75,28 @@ impl TryFrom<Pair<'_, Rule>> for Command {
     }
 }
 
+/// The action to execute on CLI
+#[derive(Debug, PartialEq, Subcommand)]
+enum Action {
+    /// Dump the current settings.
+    #[clap(name = "dump")]
+    DumpSettings,
+}
+
 /// The command-line tool for RevDB.
 #[derive(Debug, ClapParser)]
 #[command(author, version, about, long_about = None)]
 struct RevDBCli {
     #[clap(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
+
+    /// The external configuration file.
+    #[clap(short, long)]
+    config: Option<String>,
+
+    /// The action to execute.
+    #[clap(subcommand)]
+    action: Option<Action>,
 }
 
 impl RevDBCli {
@@ -107,7 +123,19 @@ impl RevDBCli {
         self.setup_logging();
 
         self.prologue();
-        let code = self.repl();
+
+        // load the global settings
+        let settings = revdb::Settings::load(self.config.clone());
+
+        let code = match self.action {
+            Some(Action::DumpSettings) => {
+                let conf = serde_yaml::to_string(&settings).unwrap();
+                println!("{}", conf);
+
+                0
+            }
+            None => self.repl(),
+        };
         self.epologue();
 
         code
