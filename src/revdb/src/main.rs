@@ -1,6 +1,14 @@
 //! RevDB: the embeddable, persistent, and revision storage.
+use atty::Stream;
 use clap::Parser as ClapParser;
-use tracing::trace;
+use pest_derive::Parser as PestParser;
+use rustyline::{error::ReadlineError, DefaultEditor};
+use tracing::{error, trace};
+
+/// The PEG based parser for RevDB CLI.
+#[derive(PestParser)]
+#[grammar = "revdb.pest"]
+pub struct RevDBParser;
 
 /// The command-line tool for RevDB.
 #[derive(Debug, ClapParser)]
@@ -17,6 +25,13 @@ impl RevDBCli {
         std::process::exit(code);
     }
 
+    /// Evaluate the given command and return the exit code.
+    pub fn eval(&self, command: &str) -> i32 {
+        trace!("eval command: {}", command);
+
+        0
+    }
+
     // ======== private methods ========
 
     /// execute revdb with the given arguments, and return the exit code.
@@ -24,10 +39,41 @@ impl RevDBCli {
         self.setup_logging();
 
         self.prologue();
-        // what you want to do here ...
+        let code = self.repl();
         self.epologue();
 
-        0
+        code
+    }
+
+    /// REPL (read-eval-print-loop) for RevDB
+    fn repl(&self) -> i32 {
+        let mut code = 0;
+        let mut rl = DefaultEditor::new().unwrap();
+
+        loop {
+            let readline = rl.readline("revdb> ");
+
+            match readline {
+                Ok(line) => {
+                    let _ = self.eval(&line);
+                }
+                Err(ReadlineError::Interrupted) => break,
+                Err(ReadlineError::Eof) => break,
+                Err(err) => {
+                    error!("readline error: {:?}", err);
+
+                    code = 1;
+                    break;
+                }
+            }
+        }
+
+        if atty::is(Stream::Stdin) {
+            // show the bye message only if the input is from the terminal
+            println!("~ Bye ~");
+        }
+
+        code
     }
 
     /// setup the logging system

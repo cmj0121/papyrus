@@ -1,0 +1,8 @@
+expression = { space* ~ command ~ space* ~ EOI }
+command    = { cmd_system }
+
+cmd_system = { cmd_help | cmd_exit }
+cmd_help   = { ^"help" }
+cmd_exit   = { ^"exit" }
+
+space = { SPACE_SEPARATOR+ }
